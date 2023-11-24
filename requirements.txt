@@ -1,0 +1,4 @@
+speechbrain
+jupyter
+transformers
+sox
