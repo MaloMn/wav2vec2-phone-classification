@@ -38,9 +38,7 @@ class ASR(sb.Brain):
         logits = self.modules.ctc_lin(x)
 
         p_ctc = self.hparams.log_softmax(logits)
-        if stage == sb.Stage.VALID or (
-                stage == sb.Stage.TEST and not self.hparams.use_language_modelling
-        ):
+        if stage == sb.Stage.VALID or (stage == sb.Stage.TEST and not self.hparams.use_language_modelling):
             p_tokens = sb.decoders.ctc_greedy_decode(
                 p_ctc, wav_lens, blank_id=self.hparams.blank_index
             )
@@ -54,8 +52,7 @@ class ASR(sb.Brain):
         ids = batch.id
         tokens, tokens_lens = batch.tokens
 
-        loss_ctc = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
-        loss = loss_ctc
+        loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
 
         if stage == sb.Stage.VALID:
             # Decode token terms to words
@@ -254,17 +251,16 @@ def dataio_prepare(hparams):
         return sig
 
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
-    label_encoder = sb.dataio.encoder.CTCTextEncoder()
 
-    # label_encoder.expect_len(hparams["output_neurons"])
+    label_encoder = sb.dataio.encoder.CTCTextEncoder()
+    label_encoder.expect_len(hparams["output_neurons"])
 
     # 3. Define text pipeline:
     @sb.utils.data_pipeline.takes("phn")
     @sb.utils.data_pipeline.provides("phn", "phn_encoded")
     def text_pipeline(phn):
         yield phn
-        yield label_encoder.encode_sequence_torch(phn)
-
+        yield label_encoder.encode_sequence_torch([phn])
 
     lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
 
@@ -273,7 +269,7 @@ def dataio_prepare(hparams):
     label_encoder.load_or_create(
         path=lab_enc_file,
         from_didatasets=[train_data],
-        output_key="phn",
+        output_key="phn_encoded",
         special_labels=special_labels,
         sequence_input=True,
     )
@@ -282,7 +278,7 @@ def dataio_prepare(hparams):
 
     # 4. Set output:
     sb.dataio.dataset.set_output_keys(
-        datasets, ["id", "sig", "phn", "char_list", "tokens"],
+        datasets, ["ID", "phn", "tokens"],
     )
 
     return train_data, valid_data, test_dataset, label_encoder
