@@ -269,7 +269,7 @@ def dataio_prepare(hparams):
     label_encoder.load_or_create(
         path=lab_enc_file,
         from_didatasets=[train_data],
-        output_key="phn_encoded",
+        output_key="phn",
         special_labels=special_labels,
         sequence_input=True,
     )

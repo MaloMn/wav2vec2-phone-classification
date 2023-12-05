@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash --login 
 
 #SBATCH --job-name=wav2vec2phone
 #SBATCH --ntasks=1
@@ -6,8 +6,11 @@
 #SBATCH --partition=gpu
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=16G
-#SBATCH --time=2:00:00
-#SBATCH --constraint='GPURAM_16GB'
+#SBATCH --time=0:10:00
+#SBATCH --constraint='GPUArch_Pascal&GPURAM_Min_16GB&GPURAM_Max_32GB'
 
-echo "Launching Wav2Vec2 fine-tuning"
-python recipe.py hparams/wav2Vec
+echo "Activating environment wav2vec" > output.txt
+conda activate wav2vec
+
+echo "Launching Wav2Vec2 fine-tuning" >> output.txt
+python recipe.py wav2vec2_phoneme.yml >> output.txt
