@@ -244,8 +244,8 @@ def dataio_prepare(hparams):
     def audio_pipeline(wav, start, duration):
         sig = sb.dataio.dataio.read_audio(({
             "file": wav,
-            "start": int(start),
-            "stop": int(start) + int(duration)
+            "start": int(start) * int(hparams["sample_rate"] / 1_000),
+            "stop": (int(start) + int(duration)) * int(hparams["sample_rate"] / 1_000)
         }))
         return sig
 
