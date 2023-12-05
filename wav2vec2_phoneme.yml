@@ -58,7 +58,7 @@ freeze_wav2vec: True
 output_neurons: 32  # 31 phones and silence in BREF
 
 # Decoding parameters
-blank_index: -1
+# blank_index: -1
 use_language_modelling: False
 # ngram_lm_path: !PLACEHOLDER
 

@@ -39,7 +39,7 @@ class ASR(sb.Brain):
         p_ctc = self.hparams.log_softmax(logits)
         if stage == sb.Stage.VALID or (stage == sb.Stage.TEST and not self.hparams.use_language_modelling):
             p_tokens = sb.decoders.ctc_greedy_decode(
-                p_ctc, wav_lens, blank_id=self.hparams.blank_index
+                p_ctc, wav_lens  # , blank_id=self.hparams.blank_index
             )
         return p_ctc, wav_lens, p_tokens
 
@@ -264,13 +264,13 @@ def dataio_prepare(hparams):
 
     lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
 
-    special_labels = {"blank_label": hparams["blank_index"]}
+    # special_labels = {"blank_label": hparams["blank_index"]}
 
     label_encoder.load_or_create(
         path=lab_enc_file,
         from_didatasets=[train_data],
         output_key="phn_list",
-        special_labels=special_labels,
+        # special_labels=special_labels,
         sequence_input=True,
     )
 
