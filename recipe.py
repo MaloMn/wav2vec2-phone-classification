@@ -49,7 +49,7 @@ class ASR(sb.Brain):
         p_ctc, wav_lens, predicted_tokens = predictions
 
         ids = batch.id
-        tokens, tokens_lens = batch.tokens
+        tokens, tokens_lens = batch.phn_encoded
 
         loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
 
@@ -59,7 +59,7 @@ class ASR(sb.Brain):
                 "".join(self.tokenizer.decode_ndim(utt_seq)).split(" ")
                 for utt_seq in predicted_tokens
             ]
-            target_words = [wrd.split(" ") for wrd in batch.wrd]
+            target_words = batch.phn_list  # [wrd.split(" ") for wrd in batch.wrd]
             self.wer_metric.append(ids, predicted_words, target_words)
             self.cer_metric.append(ids, predicted_words, target_words)
         if stage == sb.Stage.TEST:  # Language model decoding only used for test
@@ -73,7 +73,7 @@ class ASR(sb.Brain):
                     "".join(self.tokenizer.decode_ndim(utt_seq)).split(" ")
                     for utt_seq in predicted_tokens
                 ]
-            target_words = [wrd.split(" ") for wrd in batch.wrd]
+            target_words = batch.phn_list  # [wrd.split(" ") for wrd in batch.wrd]
             self.wer_metric.append(ids, predicted_words, target_words)
             self.cer_metric.append(ids, predicted_words, target_words)
         return loss
@@ -257,10 +257,10 @@ def dataio_prepare(hparams):
 
     # 3. Define text pipeline:
     @sb.utils.data_pipeline.takes("phn")
-    @sb.utils.data_pipeline.provides("phn", "phn_encoded")
+    @sb.utils.data_pipeline.provides("phn_list", "phn_encoded")
     def text_pipeline(phn):
-        yield phn
-        yield label_encoder.encode_sequence_torch([phn])
+        yield [phn]
+        yield torch.LongTensor(label_encoder.encode_sequence_torch([phn]))
 
     lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
 
@@ -269,7 +269,7 @@ def dataio_prepare(hparams):
     label_encoder.load_or_create(
         path=lab_enc_file,
         from_didatasets=[train_data],
-        output_key="phn",
+        output_key="phn_list",
         special_labels=special_labels,
         sequence_input=True,
     )
@@ -278,7 +278,7 @@ def dataio_prepare(hparams):
 
     # 4. Set output:
     sb.dataio.dataset.set_output_keys(
-        datasets, ["id", "phn", "sig"],
+        datasets, ["id", "sig", "phn_list", "phn_encoded"],
     )
 
     return train_data, valid_data, test_dataset, label_encoder
