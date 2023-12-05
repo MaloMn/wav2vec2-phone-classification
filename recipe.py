@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 class ASR(sb.Brain):
     def compute_forward(self, batch, stage):
         """Forward computations from the waveform batches to the output probabilities."""
-        print(batch)
         batch = batch.to(self.device)
         wavs, wav_lens = batch.sig
         wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
@@ -245,8 +244,8 @@ def dataio_prepare(hparams):
     def audio_pipeline(wav, start, duration):
         sig = sb.dataio.dataio.read_audio(({
             "file": wav,
-            "start": start,
-            "stop": start + duration
+            "start": int(start),
+            "stop": int(start) + int(duration)
         }))
         return sig
 
@@ -278,7 +277,7 @@ def dataio_prepare(hparams):
 
     # 4. Set output:
     sb.dataio.dataset.set_output_keys(
-        datasets, ["id", "phn"],
+        datasets, ["id", "phn", "sig"],
     )
 
     return train_data, valid_data, test_dataset, label_encoder
