@@ -278,7 +278,7 @@ def dataio_prepare(hparams):
 
     # 4. Set output:
     sb.dataio.dataset.set_output_keys(
-        datasets, ["ID", "phn", "tokens"],
+        datasets, ["id", "phn", "tokens"],
     )
 
     return train_data, valid_data, test_dataset, label_encoder
