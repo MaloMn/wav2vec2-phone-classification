@@ -25,7 +25,7 @@ valid_csv: !ref <dataset_folder>/speechbrain_validation.csv
 test_csv: !ref <dataset_folder>/speechbrain_test.csv
 
 # Training parameters
-number_of_epochs: 1
+number_of_epochs: 75
 lr: 0.9
 lr_wav2vec: 0.0001
 sorting: ascending
@@ -35,8 +35,8 @@ sample_rate: 16000
 # With data_parallel batch_size is split into N jobs
 # With DDP batch_size is multiplied by N jobs
 # Must be 3 per GPU to fit 32GB of VRAM
-batch_size: 6
-test_batch_size: 8
+batch_size: 3000  # 6 * 13000 / 25
+test_batch_size: 3000  # 8 * 4000 / 25
 
 # Dataloader options
 train_dataloader_opts:
@@ -92,7 +92,6 @@ log_softmax: !new:speechbrain.nnet.activations.Softmax
    apply_log: True
 
 mse_cost: !name:speechbrain.nnet.losses.mse_loss
-   blank_index: !ref <blank_index>
 
 modules:
    wav2vec2: !ref <wav2vec2>
