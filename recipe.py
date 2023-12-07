@@ -51,7 +51,9 @@ class ASR(sb.Brain):
         ids = batch.id
         tokens, tokens_lens = batch.phn_encoded
 
-        loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
+        print(p_ctc, tokens, wav_lens, tokens_lens)
+
+        loss = self.hparams.mse_cost(p_ctc, tokens)
 
         if stage == sb.Stage.VALID:
             # Decode token terms to words
