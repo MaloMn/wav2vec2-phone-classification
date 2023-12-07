@@ -5,7 +5,7 @@
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 2001
+seed: 1995
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 output_folder: !ref results/train_wav2vec2/<seed>
 output_wer_folder: !ref <output_folder>/
@@ -13,7 +13,7 @@ save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
 # Using the 14k wav2vec model fine-tuned on French language ONLY
-wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-light
+wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
 wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
 
 # Data files
@@ -91,7 +91,7 @@ ctc_lin: !new:speechbrain.nnet.linear.Linear
 log_softmax: !new:speechbrain.nnet.activations.Softmax
    apply_log: True
 
-ctc_cost: !name:speechbrain.nnet.losses.ctc_loss
+mse_cost: !name:speechbrain.nnet.losses.mse_loss
    blank_index: !ref <blank_index>
 
 modules:
