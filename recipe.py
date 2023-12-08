@@ -51,9 +51,9 @@ class ASR(sb.Brain):
         ids = batch.id
         tokens, tokens_lens = batch.phn_encoded
 
-        print(p_ctc, tokens, wav_lens, tokens_lens)
+        # print(p_ctc, tokens, wav_lens, tokens_lens)
 
-        loss = self.hparams.mse_cost(p_ctc, tokens)
+        loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
 
         if stage == sb.Stage.VALID:
             # Decode token terms to words
@@ -244,10 +244,14 @@ def dataio_prepare(hparams):
     @sb.utils.data_pipeline.takes("wav", "start", "duration")
     @sb.utils.data_pipeline.provides("sig")
     def audio_pipeline(wav, start, duration):
+
+        start = max(0, int(start) - 63)
+        stop = start + 128  # our segments are 127ms
+
         sig = sb.dataio.dataio.read_audio(({
             "file": wav,
-            "start": int(start) * int(hparams["sample_rate"] / 1_000),
-            "stop": (int(start) + 25) * int(hparams["sample_rate"] / 1_000)
+            "start": start * int(hparams["sample_rate"] / 1_000),
+            "stop": stop * int(hparams["sample_rate"] / 1_000)
         }))
         # print(wav, int(start) * 10 * int(hparams["sample_rate"] / 1_000), (int(start) * 10 + 25) * int(hparams["sample_rate"] / 1_000), sig)
         return sig

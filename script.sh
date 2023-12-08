@@ -9,8 +9,8 @@
 #SBATCH --time=24:00:00
 #SBATCH --constraint='GPUArch_Pascal&GPURAM_Min_16GB&GPURAM_Max_32GB'
 
-echo "Activating environment wav2vec" > output.txt
+echo "Activating environment wav2vec" > $1.txt
 conda activate wav2vec
 
-echo "Launching Wav2Vec2 fine-tuning" >> output.txt
-python recipe.py wav2vec2_phoneme.yml >> output.txt
+echo "Launching Wav2Vec2 fine-tuning" >> $1.txt
+python recipe.py wav2vec2_phoneme.yml >> $1.txt
