@@ -56,7 +56,7 @@ class ASR(sb.Brain):
         # print(logits, tokens, wav_lens, tokens_lens)
 
         target = torch.zeros(logits.size(0), logits.size(1), dtype=torch.float)
-        target.to(self.device)
+        target = target.to(self.device)
         target.scatter_(1, tokens, 1)
 
         loss = F.cross_entropy(logits, target)
