@@ -23,6 +23,7 @@ dataset_folder: /data/coros1/mmaisonneuve/wav2vec2-phoneme-classification/data
 train_csv: !ref <dataset_folder>/speechbrain_train.csv
 valid_csv: !ref <dataset_folder>/speechbrain_validation.csv
 test_csv: !ref <dataset_folder>/speechbrain_test.csv
+segment_length: 127 # milliseconds
 
 # Training parameters
 number_of_epochs: 10

@@ -241,19 +241,18 @@ def dataio_prepare(hparams):
     datasets = [train_data, valid_data, test_dataset]
 
     # 2. Define audio pipeline:
-    @sb.utils.data_pipeline.takes("wav", "start", "duration")
+    @sb.utils.data_pipeline.takes("wav", "start")
     @sb.utils.data_pipeline.provides("sig")
-    def audio_pipeline(wav, start, duration):
-
-        start = max(0, int(start) - 63)
-        stop = start + 128  # our segments are 127ms
+    def audio_pipeline(wav, start):
+        start = max(0, int(start) - hparams["segment_length"] // 2)
+        stop = start + hparams["segment_length"] + 1
 
         sig = sb.dataio.dataio.read_audio(({
             "file": wav,
             "start": start * int(hparams["sample_rate"] / 1_000),
             "stop": stop * int(hparams["sample_rate"] / 1_000)
         }))
-        # print(wav, int(start) * 10 * int(hparams["sample_rate"] / 1_000), (int(start) * 10 + 25) * int(hparams["sample_rate"] / 1_000), sig)
+
         return sig
 
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
