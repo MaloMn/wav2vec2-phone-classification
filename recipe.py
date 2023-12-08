@@ -38,14 +38,6 @@ class ASR(sb.Brain):
         p_tokens = None
         logits = self.modules.ctc_lin(x)
 
-        # print(feats.shape, logits.shape)
-
-        # p_ctc = self.hparams.log_softmax(logits)
-        # if stage == sb.Stage.VALID or (stage == sb.Stage.TEST and not self.hparams.use_language_modelling):
-        #     p_tokens =    
-        #         p_ctc, wav_lens  # , blank_id=self.hparams.blank_index
-        #     )
-
         return logits, wav_lens  # , p_tokens
 
     def compute_objectives(self, predictions, batch, stage):
@@ -54,25 +46,17 @@ class ASR(sb.Brain):
         ids = batch.id
         tokens, tokens_lens = batch.phn_encoded
 
-        print(tokens)
-
-        # print(logits, tokens, wav_lens, tokens_lens)
-
         target = torch.zeros(logits.size(0), logits.size(1), dtype=torch.float)
         target = target.to(self.device)
         target.scatter_(1, tokens, 1)
 
         loss = F.cross_entropy(logits, target)
 
-        # loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
-
         if stage != sb.Stage.TRAIN:
             # Computing phoneme error rate
             predicted = logits.max(1).indices.view(logits.size(0), 1)
-
-            print("logits:", self.tokenizer.decode_ndim(predicted), "encoded:", batch.phn_list)
-
-            self.cer_metric.append(ids, self.tokenizer.decode_ndim(predicted), batch.phn_list)  # TODO Check that .indices is enough and matches well with how the phn are encoded!
+            # TODO Check that .indices is enough and matches well with how the phn are encoded!
+            self.cer_metric.append(ids, self.tokenizer.decode_ndim(predicted), batch.phn_list)  
 
         return loss
 

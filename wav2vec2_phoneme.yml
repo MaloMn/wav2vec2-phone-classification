@@ -20,9 +20,9 @@ wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
 data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
 ckpt_interval_minutes: 25 # save checkpoint every N min
 dataset_folder: /data/coros1/mmaisonneuve/wav2vec2-phoneme-classification/data
-train_csv: !ref <dataset_folder>/speechbrain_train_30.csv
-valid_csv: !ref <dataset_folder>/speechbrain_validation_30.csv
-test_csv: !ref <dataset_folder>/speechbrain_test_30.csv
+train_csv: !ref <dataset_folder>/speechbrain_train.csv
+valid_csv: !ref <dataset_folder>/speechbrain_validation.csv
+test_csv: !ref <dataset_folder>/speechbrain_test.csv
 segment_length: 127 # milliseconds
 
 # Training parameters
@@ -36,8 +36,8 @@ sample_rate: 16000
 # With data_parallel batch_size is split into N jobs
 # With DDP batch_size is multiplied by N jobs
 # Must be 3 per GPU to fit 32GB of VRAM
-batch_size: 4
-test_batch_size: 4
+batch_size: 1000
+test_batch_size: 1000
 
 # Dataloader options
 train_dataloader_opts:
