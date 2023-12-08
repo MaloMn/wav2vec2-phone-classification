@@ -30,7 +30,7 @@ class ASR(sb.Brain):
         else:  # HuggingFace pretrained model
             feats = self.modules.wav2vec2(wavs, wav_lens)
 
-        x = self.modules.enc(feats)
+        x = self.modules.enc(feats.view(feats.size(0), -1))
 
         # Compute outputs
         p_tokens = None
@@ -38,22 +38,31 @@ class ASR(sb.Brain):
 
         print(feats.shape, logits.shape)
 
-        p_ctc = self.hparams.log_softmax(logits)
-        if stage == sb.Stage.VALID or (stage == sb.Stage.TEST and not self.hparams.use_language_modelling):
-            p_tokens = sb.decoders.ctc_greedy_decode(
-                p_ctc, wav_lens  # , blank_id=self.hparams.blank_index
-            )
-        return p_ctc, wav_lens, p_tokens
+        # p_ctc = self.hparams.log_softmax(logits)
+        # if stage == sb.Stage.VALID or (stage == sb.Stage.TEST and not self.hparams.use_language_modelling):
+        #     p_tokens = sb.decoders.ctc_greedy_decode(
+        #         p_ctc, wav_lens  # , blank_id=self.hparams.blank_index
+        #     )
+
+        return logits, wav_lens  # , p_tokens
 
     def compute_objectives(self, predictions, batch, stage):
         """Computes the loss (CTC+NLL) given predictions and targets."""
 
-        p_ctc, wav_lens, predicted_tokens = predictions
-
+        logits, wav_lens = predictions
         ids = batch.id
         tokens, tokens_lens = batch.phn_encoded
 
-        print(p_ctc, tokens, wav_lens, tokens_lens)
+        print(logits, tokens, wav_lens, tokens_lens)
+
+        a = torch.empty(1, 32, dtype=torch.long).random_(1)
+        a[0, 6] = 1
+
+        loss = torch.nn.CrossEntropyLoss(logits, a)
+
+        print(loss, logits, a)
+
+        raise Exception("Stop here.")
 
         loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
 
@@ -63,7 +72,7 @@ class ASR(sb.Brain):
                 "".join(self.tokenizer.decode_ndim(utt_seq)).split(" ")
                 for utt_seq in predicted_tokens
             ]
-            target_words = batch.phn_list  # [wrd.split(" ") for wrd in batch.wrd]
+            target_words = batch.phn_list
             self.wer_metric.append(ids, predicted_words, target_words)
             self.cer_metric.append(ids, predicted_words, target_words)
         if stage == sb.Stage.TEST:  # Language model decoding only used for test
