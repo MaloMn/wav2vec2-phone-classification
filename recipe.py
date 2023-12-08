@@ -55,10 +55,11 @@ class ASR(sb.Brain):
 
         # print(logits, tokens, wav_lens, tokens_lens)
 
-        a = torch.zeros(logits.size(0), logits.size(1), dtype=torch.float)
-        a.scatter_(1, tokens, 1)
+        target = torch.zeros(logits.size(0), logits.size(1), dtype=torch.float)
+        target.to(self.device)
+        target.scatter_(1, tokens, 1)
 
-        loss = F.cross_entropy(logits, a)
+        loss = F.cross_entropy(logits, target)
 
         # loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
 
