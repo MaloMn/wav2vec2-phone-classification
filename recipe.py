@@ -58,7 +58,7 @@ class ASR(sb.Brain):
         a = torch.empty(1, 32, dtype=torch.long).random_(1)
         a[0, 6] = 1
 
-        loss = torch.nn.CrossEntropyLoss(logits, a)
+        loss = torch.nn.CrossEntropyLoss(logits, tokens)
 
         print(loss, logits, a)
 
