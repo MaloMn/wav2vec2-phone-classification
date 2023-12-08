@@ -54,7 +54,7 @@ class ASR(sb.Brain):
 
         # print(logits, tokens, wav_lens, tokens_lens)
 
-        loss = torch.nn.CrossEntropyLoss(logits, tokens)
+        loss = torch.nn.functional.cross_entropy(logits, tokens)
 
         # loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
 
