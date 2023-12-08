@@ -7,6 +7,7 @@ import logging
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main, if_main_process
 from hyperpyyaml import load_hyperpyyaml
+import torch.nn.functional as F
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,10 @@ class ASR(sb.Brain):
 
         # print(logits, tokens, wav_lens, tokens_lens)
 
-        loss = torch.nn.functional.cross_entropy(logits, tokens)
+        a = torch.empty(1, 32, dtype=torch.long).random_(1)
+        a[0, 6] = 1
+
+        loss = F.cross_entropy(logits, a)
 
         # loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
 
