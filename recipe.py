@@ -8,6 +8,7 @@ import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main, if_main_process
 from hyperpyyaml import load_hyperpyyaml
 import torch.nn.functional as F
+import string
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class ASR(sb.Brain):
 
         # p_ctc = self.hparams.log_softmax(logits)
         # if stage == sb.Stage.VALID or (stage == sb.Stage.TEST and not self.hparams.use_language_modelling):
-        #     p_tokens = sb.decoders.ctc_greedy_decode(
+        #     p_tokens =    
         #         p_ctc, wav_lens  # , blank_id=self.hparams.blank_index
         #     )
 
@@ -53,6 +54,8 @@ class ASR(sb.Brain):
         ids = batch.id
         tokens, tokens_lens = batch.phn_encoded
 
+        print(tokens)
+
         # print(logits, tokens, wav_lens, tokens_lens)
 
         target = torch.zeros(logits.size(0), logits.size(1), dtype=torch.float)
@@ -63,9 +66,13 @@ class ASR(sb.Brain):
 
         # loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
 
-        if stage in [sb.Stage.VALID, sb.Stage.TEST]:
+        if stage != sb.Stage.TRAIN:
             # Computing phoneme error rate
-            self.cer_metric.append(ids, logits.max(1), batch.phn_list)
+            predicted = logits.max(1).indices.view(logits.size(0), 1)
+
+            print("logits:", self.tokenizer.decode_ndim(predicted), "encoded:", batch.phn_list)
+
+            self.cer_metric.append(ids, self.tokenizer.decode_ndim(predicted), batch.phn_list)  # TODO Check that .indices is enough and matches well with how the phn are encoded!
 
         return loss
 
@@ -112,7 +119,7 @@ class ASR(sb.Brain):
         """Gets called at the beginning of each epoch"""
         if stage != sb.Stage.TRAIN:
             self.cer_metric = self.hparams.cer_computer()
-            self.wer_metric = self.hparams.error_rate_computer()
+            # self.wer_metric = self.hparams.error_rate_computer()
 
     def on_stage_end(self, stage, stage_loss, epoch):
         """Gets called at the end of an epoch."""
@@ -122,7 +129,7 @@ class ASR(sb.Brain):
             self.train_stats = stage_stats
         else:
             stage_stats["CER"] = self.cer_metric.summarize("error_rate")
-            stage_stats["WER"] = self.wer_metric.summarize("error_rate")
+            # stage_stats["WER"] = self.wer_metric.summarize("error_rate")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -148,7 +155,7 @@ class ASR(sb.Brain):
                 valid_stats=stage_stats,
             )
             self.checkpointer.save_and_keep_only(
-                meta={"WER": stage_stats["WER"]}, min_keys=["WER"],
+                meta={"CER": stage_stats["CER"]}, min_keys=["CER"],
             )
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -156,8 +163,8 @@ class ASR(sb.Brain):
                 test_stats=stage_stats,
             )
             if if_main_process():
-                with open(self.hparams.test_wer_file, "w") as w:
-                    self.wer_metric.write_stats(w)
+                with open(self.hparams.test_cer_file, "w") as w:
+                    self.cer_metric.write_stats(w)
 
     def init_optimizers(self):
         "Initializes the wav2vec2 optimizer and model optimizer"
@@ -247,7 +254,8 @@ def dataio_prepare(hparams):
 
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
 
-    label_encoder = sb.dataio.encoder.CTCTextEncoder()
+    # label_encoder = sb.dataio.encoder.CTCTextEncoder()
+    label_encoder = sb.dataio.encoder.CategoricalEncoder()
     label_encoder.expect_len(hparams["output_neurons"])
 
     # 3. Define text pipeline:
@@ -255,17 +263,14 @@ def dataio_prepare(hparams):
     @sb.utils.data_pipeline.provides("phn_list", "phn_encoded")
     def text_pipeline(phn):
         yield [phn]
-        yield torch.LongTensor(label_encoder.encode_sequence_torch([phn]))
+        yield torch.LongTensor(label_encoder.encode_sequence_torch(phn))
 
     lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
-
-    # special_labels = {"blank_label": hparams["blank_index"]}
 
     label_encoder.load_or_create(
         path=lab_enc_file,
         from_didatasets=[train_data],
-        output_key="phn_list",
-        # special_labels=special_labels,
+        output_key="phn",
         sequence_input=True,
     )
 
@@ -353,13 +358,13 @@ if __name__ == "__main__":
     )
 
     # Testing
-    if not os.path.exists(hparams["output_wer_folder"]):
-        os.makedirs(hparams["output_wer_folder"])
+    if not os.path.exists(hparams["output_cer_folder"]):
+        os.makedirs(hparams["output_cer_folder"])
 
-    asr_brain.hparams.test_wer_file = os.path.join(hparams["output_wer_folder"], "wer_test.txt")
+    asr_brain.hparams.test_cer_file = os.path.join(hparams["output_cer_folder"], "cer_test.txt")
 
     asr_brain.evaluate(
         test_dataset,
         test_loader_kwargs=hparams["test_dataloader_opts"],
-        min_key="WER",
+        min_key="CER",
     )
