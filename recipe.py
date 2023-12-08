@@ -36,6 +36,8 @@ class ASR(sb.Brain):
         p_tokens = None
         logits = self.modules.ctc_lin(x)
 
+        print(feats.shape, logits.shape)
+
         p_ctc = self.hparams.log_softmax(logits)
         if stage == sb.Stage.VALID or (stage == sb.Stage.TEST and not self.hparams.use_language_modelling):
             p_tokens = sb.decoders.ctc_greedy_decode(
@@ -51,7 +53,7 @@ class ASR(sb.Brain):
         ids = batch.id
         tokens, tokens_lens = batch.phn_encoded
 
-        # print(p_ctc, tokens, wav_lens, tokens_lens)
+        print(p_ctc, tokens, wav_lens, tokens_lens)
 
         loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
 
@@ -244,6 +246,7 @@ def dataio_prepare(hparams):
     @sb.utils.data_pipeline.takes("wav", "start")
     @sb.utils.data_pipeline.provides("sig")
     def audio_pipeline(wav, start):
+        # TODO Also care about what happens if the segment is located at the end of an audio!
         start = max(0, int(start) - hparams["segment_length"] // 2)
         stop = start + hparams["segment_length"] + 1
 
@@ -252,7 +255,7 @@ def dataio_prepare(hparams):
             "start": start * int(hparams["sample_rate"] / 1_000),
             "stop": stop * int(hparams["sample_rate"] / 1_000)
         }))
-
+    
         return sig
 
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
