@@ -36,7 +36,7 @@ class ASR(sb.Brain):
         p_tokens = None
         logits = self.modules.ctc_lin(x)
 
-        print(feats.shape, logits.shape)
+        # print(feats.shape, logits.shape)
 
         # p_ctc = self.hparams.log_softmax(logits)
         # if stage == sb.Stage.VALID or (stage == sb.Stage.TEST and not self.hparams.use_language_modelling):
@@ -48,47 +48,20 @@ class ASR(sb.Brain):
 
     def compute_objectives(self, predictions, batch, stage):
         """Computes the loss (CTC+NLL) given predictions and targets."""
-
         logits, wav_lens = predictions
         ids = batch.id
         tokens, tokens_lens = batch.phn_encoded
 
-        print(logits, tokens, wav_lens, tokens_lens)
-
-        a = torch.empty(1, 32, dtype=torch.long).random_(1)
-        a[0, 6] = 1
+        # print(logits, tokens, wav_lens, tokens_lens)
 
         loss = torch.nn.CrossEntropyLoss(logits, tokens)
 
-        print(loss, logits, a)
+        # loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
 
-        raise Exception("Stop here.")
+        if stage in [sb.Stage.VALID, sb.Stage.TEST]:
+            # Computing phoneme error rate
+            self.cer_metric.append(ids, logits.max(1), batch.phn_list)
 
-        loss = self.hparams.ctc_cost(p_ctc, tokens, wav_lens, tokens_lens)
-
-        if stage == sb.Stage.VALID:
-            # Decode token terms to words
-            predicted_words = [
-                "".join(self.tokenizer.decode_ndim(utt_seq)).split(" ")
-                for utt_seq in predicted_tokens
-            ]
-            target_words = batch.phn_list
-            self.wer_metric.append(ids, predicted_words, target_words)
-            self.cer_metric.append(ids, predicted_words, target_words)
-        if stage == sb.Stage.TEST:  # Language model decoding only used for test
-            if self.hparams.use_language_modelling:
-                predicted_words = []
-                for logs in p_ctc:
-                    text = decoder.decode(logs.detach().cpu().numpy())
-                    predicted_words.append(text.split(" "))
-            else:
-                predicted_words = [
-                    "".join(self.tokenizer.decode_ndim(utt_seq)).split(" ")
-                    for utt_seq in predicted_tokens
-                ]
-            target_words = batch.phn_list  # [wrd.split(" ") for wrd in batch.wrd]
-            self.wer_metric.append(ids, predicted_words, target_words)
-            self.cer_metric.append(ids, predicted_words, target_words)
         return loss
 
     def fit_batch(self, batch):

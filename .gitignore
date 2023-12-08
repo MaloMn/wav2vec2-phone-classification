@@ -1,3 +1,5 @@
 *.out
 results/
 output.txt
+.idea/
+content/
