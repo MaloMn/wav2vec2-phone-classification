@@ -234,13 +234,14 @@ def dataio_prepare(hparams):
     @sb.utils.data_pipeline.provides("sig")
     def audio_pipeline(wav, start):
         # TODO Also care about what happens if the segment is located at the end of an audio!
-        start = max(0, int(start) - hparams["segment_length"] // 2)
+        fr: int = int(hparams["sample_rate"] / 1_000)
+        start = max(0, int(start) * fr - (hparams["segment_length"] - 10) // 2)
         stop = start + hparams["segment_length"] + 1
 
         sig = sb.dataio.dataio.read_audio(({
             "file": wav,
-            "start": start * int(hparams["sample_rate"] / 1_000),
-            "stop": stop * int(hparams["sample_rate"] / 1_000)
+            "start": start,
+            "stop": stop
         }))
     
         return sig
