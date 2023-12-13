@@ -8,7 +8,7 @@
 seed: 2001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 output_folder: !ref results/longer_train/<seed>
-output_wer_folder: !ref <output_folder>/
+output_cer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -36,8 +36,8 @@ sample_rate: 16000
 # With data_parallel batch_size is split into N jobs
 # With DDP batch_size is multiplied by N jobs
 # Must be 3 per GPU to fit 32GB of VRAM
-batch_size: 1
-test_batch_size: 1
+batch_size: 1000
+test_batch_size: 1000
 
 # Dataloader options
 train_dataloader_opts:
