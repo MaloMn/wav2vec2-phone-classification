@@ -7,7 +7,7 @@
 # Seed needs to be set at top of yaml, before objects with parameters are made
 seed: 2001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref results/longer_train/<seed>
+output_folder: !ref results/2400_frames_segments/<seed>
 output_cer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -23,10 +23,10 @@ dataset_folder: /data/coros1/mmaisonneuve/wav2vec2-phoneme-classification/data
 train_csv: !ref <dataset_folder>/speechbrain_train.csv
 valid_csv: !ref <dataset_folder>/speechbrain_validation.csv
 test_csv: !ref <dataset_folder>/speechbrain_test.csv
-segment_length: 2400 # milliseconds
+segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
 
 # Training parameters
-number_of_epochs: 10
+number_of_epochs: 15
 lr: 0.9
 lr_wav2vec: 0.0001
 sorting: ascending
