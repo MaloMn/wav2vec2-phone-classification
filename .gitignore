@@ -3,3 +3,5 @@ results/
 output.txt
 .idea/
 content/
+*.svg
+*.png
