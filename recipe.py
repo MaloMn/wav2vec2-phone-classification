@@ -56,7 +56,13 @@ class ASR(sb.Brain):
             # Computing phoneme error rate
             predicted = logits.max(1).indices.view(logits.size(0), 1)
             # TODO Check that .indices is enough and matches well with how the phn are encoded!
-            self.cer_metric.append(ids, self.tokenizer.decode_ndim(predicted), batch.phn_list)  
+            # self.cer_metric.append(ids, self.tokenizer.decode_ndim(predicted), batch.phn_list)  
+
+            predicted = [[str(element) for element in sublist] for sublist in predicted.tolist()]
+
+            # predicted = predicted.cpu().detach().numpy().astype(np.dtype.str).tolist()
+
+            self.cer_metric.append(ids, predicted, batch.phn_list)  
 
         return loss
 
@@ -189,7 +195,7 @@ def dataio_prepare(hparams):
 
     if hparams["sorting"] == "ascending":
         # we sort training data to speed up training and get better results.
-        train_data = train_data.filtered_sorted(sort_key="duration")
+        train_data = train_data.filtered_sorted(sort_key="wav")
         # when sorting do not shuffle in dataloader ! otherwise is pointless
         hparams["train_dataloader_opts"]["shuffle"] = False
 
@@ -211,7 +217,7 @@ def dataio_prepare(hparams):
     valid_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
         csv_path=hparams["valid_csv"], replacements={"data_folder": data_folder},
     )
-    valid_data = valid_data.filtered_sorted(sort_key="duration")
+    # valid_data = valid_data.filtered_sorted(sort_key="duration")
 
     # test is separate
     test_dataset = sb.dataio.dataset.DynamicItemDataset.from_csv(
@@ -240,24 +246,24 @@ def dataio_prepare(hparams):
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
 
     # label_encoder = sb.dataio.encoder.CTCTextEncoder()
-    label_encoder = sb.dataio.encoder.CategoricalEncoder()
-    label_encoder.expect_len(hparams["output_neurons"])
+    # label_encoder = sb.dataio.encoder.CategoricalEncoder()
+    # label_encoder.expect_len(hparams["output_neurons"])
 
     # 3. Define text pipeline:
     @sb.utils.data_pipeline.takes("phn")
     @sb.utils.data_pipeline.provides("phn_list", "phn_encoded")
     def text_pipeline(phn):
         yield [phn]
-        yield torch.LongTensor(label_encoder.encode_sequence_torch(phn))
+        yield torch.LongTensor([int(phn)])
 
-    lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
+    # lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
 
-    label_encoder.load_or_create(
-        path=lab_enc_file,
-        from_didatasets=[train_data],
-        output_key="phn",
-        sequence_input=True,
-    )
+    # label_encoder.load_or_create(
+    #     path=lab_enc_file,
+    #     from_didatasets=[train_data],
+    #     output_key="phn",
+    #     sequence_input=True,
+    # )
 
     sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
 
@@ -266,7 +272,7 @@ def dataio_prepare(hparams):
         datasets, ["id", "sig", "phn_list", "phn_encoded"],
     )
 
-    return train_data, valid_data, test_dataset, label_encoder
+    return train_data, valid_data, test_dataset
 
 
 if __name__ == "__main__":
@@ -288,33 +294,9 @@ if __name__ == "__main__":
     )
 
     # here we create the datasets objects as well as tokenization and encoding
-    train_data, valid_data, test_dataset, label_encoder = dataio_prepare(
+    train_data, valid_data, test_dataset = dataio_prepare(
         hparams
     )
-
-    # Loading the labels for the LM decoding and the CTC decoder
-    if hasattr(hparams, "use_language_modelling"):
-        if hparams["use_language_modelling"]:
-            try:
-                from pyctcdecode import build_ctcdecoder
-            except ImportError:
-                err_msg = "Optional dependencies must be installed to use pyctcdecode.\n"
-                err_msg += "Install using `pip install kenlm pyctcdecode`.\n"
-                raise ImportError(err_msg)
-
-            ind2lab = label_encoder.ind2lab
-            labels = [ind2lab[x] for x in range(len(ind2lab))]
-            labels = [""] + labels[
-                            1:
-                            ]  # Replace the <blank> token with a blank character, needed for PyCTCdecode
-            decoder = build_ctcdecoder(
-                labels,
-                kenlm_model_path=hparams["ngram_lm_path"],  # .arpa or .bin
-                alpha=0.5,  # Default by KenLM
-                beta=1.0,  # Default by KenLM
-            )
-    else:
-        hparams["use_language_modelling"] = False
 
     # Trainer initialization
     asr_brain = ASR(
@@ -331,7 +313,7 @@ if __name__ == "__main__":
 
     # We dynamicaly add the tokenizer to our brain class.
     # NB: This tokenizer corresponds to the one used for the LM!!
-    asr_brain.tokenizer = label_encoder
+    # asr_brain.tokenizer = label_encoder
 
     # Training
     asr_brain.fit(
