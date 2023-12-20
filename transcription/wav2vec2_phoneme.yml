@@ -7,7 +7,7 @@
 # Seed needs to be set at top of yaml, before objects with parameters are made
 seed: 2001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref results/2400_frames_segments/<seed>
+output_folder: !ref results/number_phonemes/<seed>
 output_cer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -17,16 +17,9 @@ wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
 wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
 
 # Data files
-data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
 ckpt_interval_minutes: 25 # save checkpoint every N min
-dataset_folder: /data/coros1/mmaisonneuve/wav2vec2-phoneme-classification/data
-train_csv: !ref <dataset_folder>/speechbrain_train.csv
-valid_csv: !ref <dataset_folder>/speechbrain_validation.csv
-test_csv: !ref <dataset_folder>/speechbrain_test.csv
-
-transcript_folder: /data/coros2/ProjetPathoLoc/Patho/Databases/Cancero/RUGBI/wav/
-transcription_dataset: !ref <dataset_folder>/c2si-hc.csv
-
+data_folder: /data/coros2/ProjetPathoLoc/Patho/Databases/Cancero/RUGBI/wav
+transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-test.csv
 segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
 
 # Training parameters

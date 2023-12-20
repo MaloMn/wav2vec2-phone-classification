@@ -8,7 +8,6 @@ import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main, if_main_process
 from hyperpyyaml import load_hyperpyyaml
 import torch.nn.functional as F
-import string
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +34,15 @@ class ASR(sb.Brain):
         x = self.modules.enc(feats.view(feats.size(0), -1))
 
         # Compute outputs
-        p_tokens = None
         logits = self.modules.ctc_lin(x)
 
-        return logits, wav_lens  # , p_tokens
+        return logits, wav_lens
 
     def compute_objectives(self, predictions, batch, stage):
         """Computes the loss (CTC+NLL) given predictions and targets."""
-        logits, wav_lens = predictions
+        logits, _ = predictions
         ids = batch.id
-        tokens, tokens_lens = batch.phn_encoded
+        tokens, _ = batch.phn_encoded
 
         target = torch.zeros(logits.size(0), logits.size(1), dtype=torch.float)
         target = target.to(self.device)
@@ -55,8 +53,10 @@ class ASR(sb.Brain):
         if stage != sb.Stage.TRAIN:
             # Computing phoneme error rate
             predicted = logits.max(1).indices.view(logits.size(0), 1)
-            # TODO Check that .indices is enough and matches well with how the phn are encoded!
-            self.cer_metric.append(ids, self.tokenizer.decode_ndim(predicted), batch.phn_list)  
+            predicted = [[str(element) for element in sublist] for sublist in predicted.tolist()]
+
+            # predicted = predicted.cpu().detach().numpy().astype(np.dtype.str).tolist()
+            self.cer_metric.append(ids, predicted, batch.phn_list)  
 
         return loss
 
@@ -181,48 +181,11 @@ class ASR(sb.Brain):
 def dataio_prepare(hparams):
     """This function prepares the datasets to be used in the brain class.
     It also defines the data processing pipeline through user-defined functions."""
-    data_folder = hparams["data_folder"]
-
-    train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["train_csv"], replacements={"data_folder": data_folder},
-    )
-
-    if hparams["sorting"] == "ascending":
-        # we sort training data to speed up training and get better results.
-        train_data = train_data.filtered_sorted(sort_key="duration")
-        # when sorting do not shuffle in dataloader ! otherwise is pointless
-        hparams["train_dataloader_opts"]["shuffle"] = False
-
-    elif hparams["sorting"] == "descending":
-        train_data = train_data.filtered_sorted(
-            sort_key="duration", reverse=True
-        )
-        # when sorting do not shuffle in dataloader ! otherwise is pointless
-        hparams["train_dataloader_opts"]["shuffle"] = False
-
-    elif hparams["sorting"] == "random":
-        pass
-
-    else:
-        raise NotImplementedError(
-            "sorting must be random, ascending or descending"
-        )
-
-    valid_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["valid_csv"], replacements={"data_folder": data_folder},
-    )
-    valid_data = valid_data.filtered_sorted(sort_key="duration")
-
-    # test is separate
-    test_dataset = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["test_csv"], replacements={"data_folder": data_folder},
-    )
-
     transcription_dataset = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["transcription_dataset"], replacements={"data_folder": hparams["transcript_folder"]},
+        csv_path=hparams["transcription_dataset"], replacements={"data_folder": hparams["data_folder"]},
     )
 
-    datasets = [train_data, valid_data, test_dataset, transcription_dataset]
+    datasets = [transcription_dataset]
 
     # 2. Define audio pipeline:
     @sb.utils.data_pipeline.takes("wav", "start")
@@ -243,25 +206,12 @@ def dataio_prepare(hparams):
 
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
 
-    # label_encoder = sb.dataio.encoder.CTCTextEncoder()
-    label_encoder = sb.dataio.encoder.CategoricalEncoder()
-    label_encoder.expect_len(hparams["output_neurons"])
-
     # 3. Define text pipeline:
     @sb.utils.data_pipeline.takes("phn")
     @sb.utils.data_pipeline.provides("phn_list", "phn_encoded")
     def text_pipeline(phn):
         yield [phn]
-        yield torch.LongTensor(label_encoder.encode_sequence_torch(phn))
-
-    lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
-
-    label_encoder.load_or_create(
-        path=lab_enc_file,
-        from_didatasets=[train_data],
-        output_key="phn",
-        sequence_input=True,
-    )
+        yield torch.LongTensor([int(phn)])
 
     sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
 
@@ -270,7 +220,7 @@ def dataio_prepare(hparams):
         datasets, ["id", "sig", "phn_list", "phn_encoded"],
     )
 
-    return train_data, valid_data, test_dataset, label_encoder, transcription_dataset
+    return transcription_dataset
 
 
 if __name__ == "__main__":
@@ -290,7 +240,7 @@ if __name__ == "__main__":
     )
 
     # here we create the datasets objects as well as tokenization and encoding
-    train_data, valid_data, test_dataset, label_encoder, transcription_dataset = dataio_prepare(hparams)
+    transcription_dataset = dataio_prepare(hparams)
 
     # Trainer initialization
     asr_brain = ASR(

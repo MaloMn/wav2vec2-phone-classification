@@ -5,3 +5,5 @@ output.txt
 content/
 *.svg
 *.png
+*.txt
+*.wav
