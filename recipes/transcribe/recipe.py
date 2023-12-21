@@ -3,11 +3,14 @@
 import os
 import sys
 import torch
+import json
 import logging
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main, if_main_process
+from torch.utils.data import DataLoader
 from hyperpyyaml import load_hyperpyyaml
 import torch.nn.functional as F
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +180,32 @@ class ASR(sb.Brain):
         self.wav2vec_optimizer.zero_grad(set_to_none)
         self.model_optimizer.zero_grad(set_to_none)
 
+    def transcribe_dataset(self, dataset, min_key, loader_kwargs):
+        # If dataset isn't a Dataloader, we create it. 
+        if not isinstance(dataset, DataLoader):
+            loader_kwargs["ckpt_prefix"] = None
+            dataset = self.make_dataloader(
+                dataset, sb.Stage.TEST, **loader_kwargs
+            )
+
+        self.on_evaluate_start(min_key=min_key) # We call the on_evaluate_start that will load the best model
+        self.modules.eval() # We set the model to eval mode (remove dropout etc)
+
+        # Now we iterate over the dataset and we simply compute_forward and decode
+        with torch.no_grad():
+
+            transcripts = []
+            truth = []
+            for batch in tqdm(dataset, dynamic_ncols=True):
+                # Make sure that your compute_forward returns the predictions !!!
+                logits, _ = self.compute_forward(batch, stage=sb.Stage.TEST) 
+                predicted = logits.max(1).indices.view(logits.size(0), 1).tolist()
+                
+                transcripts += predicted
+                truth += [[int(b) for b in a] for a in batch.phn_list]
+
+        return transcripts, truth
+
 
 def dataio_prepare(hparams):
     """This function prepares the datasets to be used in the brain class.
@@ -250,7 +279,14 @@ if __name__ == "__main__":
         checkpointer=hparams["checkpointer"],
     )
 
-    transcripts = asr_brain.transcribe_dataset(
+    transcripts, truth = asr_brain.transcribe_dataset(
         dataset=transcription_dataset,  # Must be obtained from the dataio_function
         min_key="CER",  # We load the model with the lowest WER
+        loader_kwargs=hparams["transcribe_dataloader_opts"], # opts for the dataloading
     )
+
+    with open(hparams["output_transcription"], "w+") as f:
+        json.dump({
+            "labels": truth,
+            "predicted": transcripts
+        }, f)

@@ -1,14 +1,12 @@
 # ################################
-# Model: wav2vec2 + DNN + CTC
-# Augmentation: SpecAugment
-# Authors: Sung-Lin Yeh 2021
+# Model: wav2vec2 + DNN
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
 seed: 2001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref results/number_phonemes/<seed>
-output_cer_folder: !ref <output_folder>/
+output_folder: !ref results/weighted-layers-frozen/<seed>
+output_wer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -16,10 +14,18 @@ train_log: !ref <output_folder>/train_log.txt
 wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
 wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
 
+# Weighted model
+weighted_ssl_model: !new:speechbrain.lobes.models.huggingface_wav2vec.WeightedSSLModel
+   hub: !ref <wav2vec2_hub>
+   num_layers: 25 # 24 transformer layers + 1 output layer
+
 # Data files
+data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
 ckpt_interval_minutes: 25 # save checkpoint every N min
-data_folder: /data/coros2/ProjetPathoLoc/Patho/Databases/Cancero/RUGBI/wav
-transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-test.csv
+dataset_folder: /data/coros1/mmaisonneuve/datasets/bref
+train_csv: !ref <dataset_folder>/train.csv
+valid_csv: !ref <dataset_folder>/validation.csv
+test_csv: !ref <dataset_folder>/test.csv
 segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
 
 # Training parameters
@@ -33,8 +39,8 @@ sample_rate: 16000
 # With data_parallel batch_size is split into N jobs
 # With DDP batch_size is multiplied by N jobs
 # Must be 3 per GPU to fit 32GB of VRAM
-batch_size: 1000
-test_batch_size: 1000
+batch_size: 1024
+test_batch_size: 1024
 
 # Dataloader options
 train_dataloader_opts:
