@@ -7,3 +7,4 @@ content/
 *.png
 *.txt
 *.wav
+**/*_accuracies.json
