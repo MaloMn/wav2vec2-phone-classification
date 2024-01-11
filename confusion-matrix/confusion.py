@@ -5,8 +5,56 @@ import numpy as np
 import json
 
 
+def reader_bref(filepath, numeric_phones):
+    def translator(character):
+        character = character.replace(" ; ", "").replace(" ", "").replace("<eps>", "")
+        index = int(character)
+
+        if index == 0:
+            return "silence"
+
+        for phone, i in numeric_phones.items():
+            if i == index:
+                return phone
+
+    with open(filepath) as f:
+        lines = [line.replace("\n", "") for line in f.readlines()]
+
+    true_labels = np.array([translator(value) for value in lines[13::5]])
+    predicted_labels = np.array([translator(value) for value in lines[15::5]])
+
+    return true_labels, predicted_labels
+
+
+def reader_c2si(filepath, numeric_phones):
+    with open(filepath) as f:
+        data = json.load(f)
+
+    def translator(index):
+        if index == 0:
+            return "silence"
+
+        for phone, i in numeric_phones.items():
+            if i == index:
+                return phone
+
+    labels = np.array([translator(value[0]) for value in data["labels"]])
+    predicted = np.array([translator(value[0]) for value in data["predicted"]])
+
+    return labels, predicted
+
+
+def linear_mapping_function(x1, y1, x2, y2):
+    # Calculate the slope and intercept of the linear equation
+    slope = (y2 - y1) / (x2 - x1)
+    intercept = y1 - slope * x1
+
+    # Define the linear mapping lambda function
+    return lambda x: slope * x + intercept
+
+
 class Confusion:
-    def __init__(self, filepath):
+    def __init__(self, filepath, phones_subset=None, output_suffix=""):
         with open("numeric_phones.json") as f:
             self.numeric_phones = json.load(f)
 
@@ -14,54 +62,21 @@ class Confusion:
             self.phones = json.load(f)
 
         self.filepath = filepath
+        self.output_png = self.filepath.split(".")[0] + output_suffix + ".png"
+        self.label_names_organized = ["sil", "a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "w", "ɥ", "j", "l", "ʁ",
+                                      "n", "m", "ɲ", "p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"]
+        self.phones_subset = phones_subset
 
         if "bref/" in self.filepath:
-            self.labels, self.predicted = self.reader_bref()
-        elif "c2si" in self.filepath:
-            self.labels, self.predicted = self.reader_c2si()
+            self.labels, self.predicted = reader_bref(self.filepath, self.numeric_phones)
+        elif "c2si/" in self.filepath:
+            self.labels, self.predicted = reader_c2si(self.filepath, self.numeric_phones)
         else:
             raise Exception("This dataset is not supported yet.")
 
         self.accuracy, self.balanced = self.get_accuracies()
         self.confusion_matrix = self.compute_confusion_matrix()
         self.plot_confusion_matrix()
-
-    def reader_bref(self):
-        def translator(character):
-            character = character.replace(" ; ", "").replace(" ", "").replace("<eps>", "")
-            index = int(character)
-
-            if index == 0:
-                return "silence"
-
-            for phone, i in self.numeric_phones.items():
-                if i == index:
-                    return phone
-
-        with open(self.filepath) as f:
-            lines = [line.replace("\n", "") for line in f.readlines()]
-
-        true_labels = np.array([translator(value) for value in lines[13::5]])
-        predicted_labels = np.array([translator(value) for value in lines[15::5]])
-
-        return true_labels, predicted_labels
-
-    def reader_c2si(self):
-        with open(self.filepath) as f:
-            data = json.load(f)
-
-        def translator(index):
-            if index == 0:
-                return "silence"
-
-            for phone, i in self.numeric_phones.items():
-                if i == index:
-                    return phone
-
-        labels = np.array([translator(value[0]) for value in data["labels"]])
-        predicted = np.array([translator(value[0]) for value in data["predicted"]])
-
-        return labels, predicted
 
     def get_accuracies(self, save=True):
         # Remove silences
@@ -86,7 +101,7 @@ class Confusion:
         )
 
         if save:
-            with open(self.filepath.split('.')[0] + "_accuracies.json", "w+") as f:
+            with open(self.output_png.split('.')[0] + "_accuracies.json", "w+") as f:
                 json.dump({
                     "accuracy": round(accuracy*100, 2),
                     "balanced_accuracy": round(balanced_accuracy * 100, 2)
@@ -95,35 +110,19 @@ class Confusion:
         return accuracy, balanced_accuracy
 
     def compute_confusion_matrix(self):
-        label_names_existing = list(set([self.phones[a] for a in self.labels]))
-        label_names_organized = ["sil", "a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "w", "ɥ", "j", "l", "ʁ",
-                                 "n", "m", "ɲ", "p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"]
+        cm = confusion_matrix([self.phones[a] for a in self.labels], [self.phones[a] for a in self.predicted], normalize="true", labels=self.label_names_organized)
 
-        cm = confusion_matrix([self.phones[a] for a in self.labels], [self.phones[a] for a in self.predicted], normalize="true")
-
-        # Use the specified labels order to link current cm layout to organized layout
-        new_order = [label_names_existing.index(label) for label in label_names_organized if
-                     label in label_names_existing]
-        cm = cm[:, new_order][new_order, :]
-
-        # Adding lines for phonemes that were not present in the input audio
-        for i in range(len(label_names_organized)):
-            if label_names_organized[i] not in label_names_existing:
-                cm = np.insert(cm, i, 0.0, axis=1)
-                cm = np.insert(cm, i, 0.0, axis=0)
-
-        # Set 0 lines to NaN
         for i in range(cm.shape[0]):
             if np.count_nonzero(cm[i, :]) == 0:
                 cm[i, :] = np.nan
 
+        if self.phones_subset is not None:
+            keep_indexes = [self.label_names_organized.index(a) for a in self.phones_subset]
+            cm = cm[:, keep_indexes][keep_indexes, :]
+
         return cm
 
     def plot_confusion_matrix(self, savefig=True, file='', cmap=plt.cm.pink_r):
-        label_names_organized_phonetic = ["sil", "a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "w", "ɥ", "j", "l",
-                                          "ʁ", "n", "m", "ɲ", "p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z",
-                                          "ʒ"]
-
         fig, ax = plt.subplots(dpi=125)
         fig.set_size_inches(15, 12, forward=True)
 
@@ -134,31 +133,47 @@ class Confusion:
         ax.set_title(file, fontsize=20)
         plt.colorbar(im, ax=ax)
 
-        # TODO Add title to the figure
+        if "bref/" in self.filepath:
+            title = "BREF"
+        else:
+            title = self.filepath.replace("c2si/output_", "").replace(".json", "").replace("_", " ")
+        ax.set_title("Confusion Matrix - " + title, fontsize=20)
 
-        tick_marks = np.arange(len(label_names_organized_phonetic))
+        labels = self.phones_subset if self.phones_subset is not None else self.label_names_organized
+
+        tick_marks = np.arange(len(labels))
         ax.set_xticks(tick_marks)
         ax.set_yticks(tick_marks)
-        ax.set_xticklabels([f"/{a}/" for a in label_names_organized_phonetic], fontsize=14)
-        ax.set_yticklabels([f"/{a}/" for a in label_names_organized_phonetic], fontsize=14)
+
+        fontsize = linear_mapping_function(1, 27, 31, 14)(len(labels))
+        ax.set_xticklabels([f"/{a}/" for a in labels], fontsize=fontsize)
+        ax.set_yticklabels([f"/{a}/" for a in labels], fontsize=fontsize)
 
         ax.grid(False)
 
+        fontsize = linear_mapping_function(1, 23, 31, 10)(len(labels))
         for i, j in itertools.product(range(self.confusion_matrix.shape[0]), range(self.confusion_matrix.shape[1])):
             color = "white" if self.confusion_matrix[i, j] > 0.6 else "black"
             ax.text(j, i, f'{self.confusion_matrix[i, j] * 100:.1f}',
-                    ha="center", va="center", color=color, fontsize=10)
+                    ha="center", va="center", color=color, fontsize=fontsize)
 
         plt.tight_layout(pad=3)
         ax.set_ylabel('True labels', fontsize=18)
         ax.set_xlabel('Predicted labels', fontsize=18)
 
         if savefig:
-            plt.savefig(self.filepath.split(".")[0] + ".png", bbox_inches='tight', pad_inches=0.1)
-            print(f"Confusion matrix was saved at {self.filepath.split('.')[0] + '.png'}")
+            plt.savefig(self.output_png, bbox_inches='tight', pad_inches=0.1)
+            print(f"Confusion matrix was saved at {self.output_png}")
 
 
 if __name__ == '__main__':
     # Confusion("bref/cer_test_15_epochs.txt")
     # Confusion("c2si/output_hc_dap.json")
-    Confusion("c2si/output_hc_lec.json")
+    # Confusion("c2si/output_hc_lec.json")
+    # Confusion("c2si/output_healthy_controls.json")
+
+    Confusion("c2si/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
+    Confusion("bref/cer_test_15_epochs.txt", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
+
+    Confusion("c2si/output_hc_lec.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
+    Confusion("bref/cer_test_15_epochs.txt", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
