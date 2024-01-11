@@ -3,7 +3,7 @@
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 2001
+seed: 2014
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 output_folder: !ref results/weighted-layers-frozen/<seed>
 output_wer_folder: !ref <output_folder>/
@@ -16,7 +16,7 @@ wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
 
 # Weighted model
 weighted_ssl_model: !new:speechbrain.lobes.models.huggingface_wav2vec.WeightedSSLModel
-   hub: !ref <wav2vec2_hub>
+   encoder: !ref <wav2vec2>
    num_layers: 25 # 24 transformer layers + 1 output layer
 
 # Data files
@@ -32,6 +32,8 @@ segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
 number_of_epochs: 15
 lr: 0.9
 lr_wav2vec: 0.0001
+lr_weights: 0.1
+
 sorting: ascending
 auto_mix_prec: False
 sample_rate: 16000
@@ -72,10 +74,6 @@ use_language_modelling: False
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
    limit: !ref <number_of_epochs>
 
-augmentation: !new:speechbrain.lobes.augment.TimeDomainSpecAugment
-   sample_rate: !ref <sample_rate>
-   speeds: [95, 100, 105]
-
 enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
    input_shape: [null, 6144]
    activation: !ref <activation>
@@ -87,6 +85,8 @@ wav2vec2: !new:speechbrain.lobes.models.huggingface_wav2vec.HuggingFaceWav2Vec2
    output_norm: True
    freeze: !ref <freeze_wav2vec>
    save_path: !ref <wav2vec2_folder>
+   apply_spec_augment: False
+   output_all_hiddens: True
 
 ctc_lin: !new:speechbrain.nnet.linear.Linear
    input_size: !ref <dnn_neurons>
@@ -102,6 +102,7 @@ modules:
    wav2vec2: !ref <wav2vec2>
    enc: !ref <enc>
    ctc_lin: !ref <ctc_lin>
+   weighted_ssl_model: !ref <weighted_ssl_model>
 
 model: !new:torch.nn.ModuleList
    - [!ref <enc>, !ref <ctc_lin>]
@@ -114,6 +115,9 @@ model_opt_class: !name:torch.optim.Adadelta
 wav2vec_opt_class: !name:torch.optim.Adam
    lr: !ref <lr_wav2vec>
 
+weights_opt_class: !name:torch.optim.Adam
+    lr: !ref <lr_weights>
+
 lr_annealing_model: !new:speechbrain.nnet.schedulers.NewBobScheduler
    initial_value: !ref <lr>
    improvement_threshold: 0.0025
@@ -125,6 +129,11 @@ lr_annealing_wav2vec: !new:speechbrain.nnet.schedulers.NewBobScheduler
    improvement_threshold: 0.0025
    annealing_factor: 0.9
    patient: 0
+
+lr_annealing_weights: !new:speechbrain.nnet.schedulers.NewBobScheduler
+    initial_value: !ref <lr_weights>
+    improvement_threshold: 0.0025
+    annealing_factor: 0.9
 
 label_encoder: !new:speechbrain.dataio.encoder.CTCTextEncoder
 

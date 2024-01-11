@@ -11,30 +11,33 @@ output_folder: !ref results/number_phonemes/<seed>
 output_cer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
-output_transcription: !ref <output_folder>/transcript.json
 
 # Using the 14k wav2vec model fine-tuned on French language ONLY
 wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
 wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
 
 # Data files
+data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
 ckpt_interval_minutes: 25 # save checkpoint every N min
-data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
-transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-lec-test.csv
+dataset_folder: /data/coros1/mmaisonneuve/datasets/bref
+train_csv: !ref <dataset_folder>/train.csv
+valid_csv: !ref <dataset_folder>/validation.csv
+test_csv: !ref <dataset_folder>/test.csv
 segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
 
 # Training parameters
 number_of_epochs: 15
 lr: 0.9
 lr_wav2vec: 0.0001
+sorting: ascending
 auto_mix_prec: False
 sample_rate: 16000
 
 # With data_parallel batch_size is split into N jobs
 # With DDP batch_size is multiplied by N jobs
 # Must be 3 per GPU to fit 32GB of VRAM
-batch_size: 1000
-test_batch_size: 1000
+batch_size: 1024
+test_batch_size: 1024
 
 # Dataloader options
 train_dataloader_opts:
@@ -44,9 +47,6 @@ valid_dataloader_opts:
    batch_size: !ref <batch_size>
 
 test_dataloader_opts:
-   batch_size: !ref <test_batch_size>
-
-transcribe_dataloader_opts:
    batch_size: !ref <test_batch_size>
 
 # Model parameters

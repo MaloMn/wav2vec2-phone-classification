@@ -20,7 +20,17 @@ class ASR(sb.Brain):
         wavs, wav_lens = batch.sig
         wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
 
-        feats = self.modules.weighted_ssl_model(wavs)
+        # Forward pass (NOTE: I removed some code here)
+
+        # Handling SpeechBrain vs HuggingFace pretrained models
+        if hasattr(self.modules, "extractor"):  # SpeechBrain pretrained model
+            latents = self.modules.extractor(wavs)
+            feats = self.modules.encoder_wrapper(latents, wav_lens=wav_lens)[
+                "embeddings"
+            ]
+        else:  # HuggingFace pretrained model
+            feats = self.modules.wav2vec2(wavs, wav_lens)
+
         x = self.modules.enc(feats.view(feats.size(0), -1))
 
         # Compute outputs
@@ -55,10 +65,8 @@ class ASR(sb.Brain):
 
         # Managing automatic mixed precision
         if self.auto_mix_prec:
-            # self.wav2vec_optimizer.zero_grad()
+            self.wav2vec_optimizer.zero_grad()
             self.model_optimizer.zero_grad()
-            self.weights_optimizer.zero_grad()
-
             with torch.cuda.amp.autocast():
                 with self.no_sync():
                     outputs = self.compute_forward(batch, sb.Stage.TRAIN)
@@ -67,37 +75,26 @@ class ASR(sb.Brain):
                 self.scaler.scale(
                     loss / self.grad_accumulation_factor
                 ).backward()
-
             if should_step:
-                # if not self.hparams.freeze_wav2vec:
-                #     self.scaler.unscale_(self.wav2vec_optimizer)
-
+                if not self.hparams.freeze_wav2vec:
+                    self.scaler.unscale_(self.wav2vec_optimizer)
                 self.scaler.unscale_(self.model_optimizer)
-                self.scaler.unscale_(self.weights_optimizer)
-
                 if self.check_gradients(loss):
-                    # self.scaler.step(self.wav2vec_optimizer)
+                    self.scaler.step(self.wav2vec_optimizer)
                     self.scaler.step(self.model_optimizer)
-
                 self.scaler.update()
                 self.optimizer_step += 1
         else:
             with self.no_sync():
                 outputs = self.compute_forward(batch, sb.Stage.TRAIN)
-
             loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
             (loss / self.grad_accumulation_factor).backward()
-
             if should_step:
                 if self.check_gradients(loss):
-                    # self.wav2vec_optimizer.step()
+                    self.wav2vec_optimizer.step()
                     self.model_optimizer.step()
-                    self.weights_optimizer.step()
-
-                # self.wav2vec_optimizer.zero_grad()
+                self.wav2vec_optimizer.zero_grad()
                 self.model_optimizer.zero_grad()
-                self.weights_optimizer.zero_grad()
-                
                 self.optimizer_step += 1
 
         return loss.detach().cpu()
@@ -115,28 +112,28 @@ class ASR(sb.Brain):
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
         else:
-            # stage_stats["CER"] = self.cer_metric.summarize("error_rate")
             stage_stats["WER"] = self.wer_metric.summarize("error_rate")
+            # stage_stats["WER"] = self.wer_metric.summarize("error_rate")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            old_lr_model, new_lr_model = self.hparams.lr_annealing_model(stage_stats["loss"])
-            # old_lr_wav2vec, new_lr_wav2vec = self.hparams.lr_annealing_wav2vec(stage_stats["loss"])
-
-            sb.nnet.schedulers.update_learning_rate(self.model_optimizer, new_lr_model)
-            # sb.nnet.schedulers.update_learning_rate(self.wav2vec_optimizer, new_lr_wav2vec)
-
-            old_lr_encoder, new_lr_encoder = self.hparams.lr_annealing_weights(stage_stats["loss"])
-            sb.nnet.schedulers.update_learning_rate(self.weights_optimizer, new_lr_encoder)
-
-            print(self.modules.weighted_ssl_model.weights)
-
+            old_lr_model, new_lr_model = self.hparams.lr_annealing_model(
+                stage_stats["loss"]
+            )
+            old_lr_wav2vec, new_lr_wav2vec = self.hparams.lr_annealing_wav2vec(
+                stage_stats["loss"]
+            )
+            sb.nnet.schedulers.update_learning_rate(
+                self.model_optimizer, new_lr_model
+            )
+            sb.nnet.schedulers.update_learning_rate(
+                self.wav2vec_optimizer, new_lr_wav2vec
+            )
             self.hparams.train_logger.log_stats(
                 stats_meta={
                     "epoch": epoch,
                     "lr_model": old_lr_model,
-                    # "lr_wav2vec": old_lr_wav2vec,
-                    "lr_weights": old_lr_encoder
+                    "lr_wav2vec": old_lr_wav2vec,
                 },
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
@@ -155,34 +152,30 @@ class ASR(sb.Brain):
 
     def init_optimizers(self):
         "Initializes the wav2vec2 optimizer and model optimizer"
-        # Handling SpeechBrain vs HuggingFace pretrained models
-        # if hasattr(self.modules, "extractor"):  # SpeechBrain pretrained model
-        #     self.wav2vec_optimizer = self.hparams.wav2vec_opt_class(
-        #         self.modules.encoder_wrapper.parameters()
-        #     )
+        # Handling SpeechBrain vs HuggingFance pretrained models
+        if hasattr(self.modules, "extractor"):  # SpeechBrain pretrained model
+            self.wav2vec_optimizer = self.hparams.wav2vec_opt_class(
+                self.modules.encoder_wrapper.parameters()
+            )
 
-        # else:  # HuggingFace pretrained model
-        #     self.wav2vec_optimizer = self.hparams.wav2vec_opt_class(
-        #         self.modules.wav2vec2.parameters()
-        #     )
-
-        self.weights_optimizer = self.hparams.weights_opt_class(
-            [self.modules.weighted_ssl_model.weights]
-        )
+        else:  # HuggingFace pretrained model
+            self.wav2vec_optimizer = self.hparams.wav2vec_opt_class(
+                self.modules.wav2vec2.parameters()
+            )
 
         self.model_optimizer = self.hparams.model_opt_class(
             self.hparams.model.parameters()
         )
 
         if self.checkpointer is not None:
-            # self.checkpointer.add_recoverable("wav2vec_opt", self.wav2vec_optimizer)
+            self.checkpointer.add_recoverable(
+                "wav2vec_opt", self.wav2vec_optimizer
+            )
             self.checkpointer.add_recoverable("modelopt", self.model_optimizer)
-            self.checkpointer.add_recoverable("weights_opt", self.weights_optimizer)
 
     def zero_grad(self, set_to_none=False):
-        # self.wav2vec_optimizer.zero_grad(set_to_none)
+        self.wav2vec_optimizer.zero_grad(set_to_none)
         self.model_optimizer.zero_grad(set_to_none)
-        self.weights_optimizer.zero_grad(set_to_none)
 
 
 def dataio_prepare(hparams):
@@ -218,7 +211,7 @@ def dataio_prepare(hparams):
         # TODO Also care about what happens if the segment is located at the end of an audio!
         fr: int = int(hparams["sample_rate"] / 1_000)
         start = max(0, int(start) * fr - (hparams["segment_length"] - 10) // 2)
-        stop = start + hparams["segment_length"]
+        stop = start + hparams["segment_length"] + 1
 
         sig = sb.dataio.dataio.read_audio(({
             "file": wav,
@@ -282,6 +275,10 @@ if __name__ == "__main__":
     if "pretrainer" in hparams.keys():
         run_on_main(hparams["pretrainer"].collect_files)
         hparams["pretrainer"].load_collected(asr_brain.device)
+
+    # We dynamicaly add the tokenizer to our brain class.
+    # NB: This tokenizer corresponds to the one used for the LM!!
+    # asr_brain.tokenizer = label_encoder
 
     # Training
     asr_brain.fit(
