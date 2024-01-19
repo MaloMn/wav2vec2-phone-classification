@@ -207,12 +207,14 @@ class ASR(sb.Brain):
         return transcripts, truth
 
 
-def dataio_prepare(hparams):
+def dataio_prepare(hparams, hdatasets):
     """This function prepares the datasets to be used in the brain class.
     It also defines the data processing pipeline through user-defined functions."""
+
     transcription_dataset = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["transcription_dataset"], replacements={"data_folder": hparams["data_folder"]},
+        csv_path=hdatasets["transcription_dataset"], replacements={"data_folder": hdatasets["data_folder"]},
     )
+    transcription_dataset = transcription_dataset.filtered_sorted(sort_key="wav")
 
     datasets = [transcription_dataset]
 
@@ -268,9 +270,6 @@ if __name__ == "__main__":
         overrides=overrides,
     )
 
-    # here we create the datasets objects as well as tokenization and encoding
-    transcription_dataset = dataio_prepare(hparams)
-
     # Trainer initialization
     asr_brain = ASR(
         modules=hparams["modules"],
@@ -279,14 +278,17 @@ if __name__ == "__main__":
         checkpointer=hparams["checkpointer"],
     )
 
-    transcripts, truth = asr_brain.transcribe_dataset(
-        dataset=transcription_dataset,  # Must be obtained from the dataio_function
-        min_key="CER",  # We load the model with the lowest WER
-        loader_kwargs=hparams["transcribe_dataloader_opts"], # opts for the dataloading
-    )
+    for k, v in hparams["to_transcribe"].items():
+        transcription_dataset = dataio_prepare(hparams, v)
+        
+        transcripts, truth = asr_brain.transcribe_dataset(
+            dataset=transcription_dataset,  # Must be obtained from the dataio_function
+            min_key="CER",  # We load the model with the lowest WER
+            loader_kwargs=hparams["transcribe_dataloader_opts"], # opts for the dataloading
+        )
 
-    with open(hparams["output_transcription"], "w+") as f:
-        json.dump({
-            "labels": truth,
-            "predicted": transcripts
-        }, f)
+        with open(hparams["output_transcription"].format(dataset=k), "w+") as f:
+            json.dump({
+                "labels": truth,
+                "predicted": transcripts
+            }, f)

@@ -3,7 +3,7 @@
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 2014
+seed: 2014 # Model lebenchmark 14k large, output folder is "...-frozen"
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 output_folder: !ref results/weighted-layers-frozen/<seed>
 output_wer_folder: !ref <output_folder>/
@@ -29,7 +29,7 @@ test_csv: !ref <dataset_folder>/test.csv
 segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
 
 # Training parameters
-number_of_epochs: 15
+number_of_epochs: 25
 lr: 0.9
 lr_wav2vec: 0.0001
 lr_weights: 0.1

@@ -9,72 +9,13 @@ from speechbrain.utils.distributed import run_on_main, if_main_process
 from hyperpyyaml import load_hyperpyyaml
 import torch.nn.functional as F
 
+from typing import overload
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+import json
+
 logger = logging.getLogger(__name__)
 
-
-# class WeightedSSLModel(torch.nn.Module):
-#     """This lobe enables the integration of use of weighted sum representations
-#     from different layers in a SSL encoder.
-
-#     The model can be used as a fixed feature extractor for SSL benchmarking. It
-#     will download automatically the model from HuggingFace or use a local path.
-
-#     More details in recipes/SSL_benchmark
-
-#     Arguments
-#     ---------
-#     hub : str
-#         HuggingFace hub name: e.g "facebook/wav2vec2-large-lv60"
-#     num_layers: int
-#         Number of internal layers: e.g 13 for "Base" models.
-#     layernorm: bool
-#         Whether layer representations should be layernormed before sum
-#     Example
-#     -------
-#     >>> inputs = torch.rand([10, ])
-#     >>> model_hub = "facebook/wav2vec2-base-h"
-#     >>> num_layers = 13
-#     >>> model = WeightedSSLModel(model_hub, num_layers)
-#     >>> outputs = model(inputs)
-#     """
-
-#     def __init__(self, encoder, num_layers, layernorm=False):
-#         super().__init__()
-#         self.encoder = encoder
-#         # self.encoder = AutoModel.from_pretrained(hub, output_hidden_states=True, apply_spec_augment=False)
-#         self.num_layers = num_layers
-#         # Initializing the learnable weights
-#         zero_init = torch.cat([torch.zeros(self.num_layers)])
-#         self.weights = torch.nn.Parameter(zero_init, requires_grad=True)
-#         self.layernorm = layernorm
-
-#     def forward(self, wav, wav_lens=None):
-#         """This method outputs a weighted sum of the layers representations of the SSL encoder
-#         Arguments
-#         ---------
-#         wav : tensor
-#             The wavs
-#         """
-
-#         feats = self.encoder(wav)
-#         # hidden_states = torch.stack(feats.hidden_states, dim=0).detach()
-#         hidden_states = feats
-#         # First dimension should be equal to the number of layers in the hparams
-#         assert (
-#             self.num_layers == hidden_states.shape[0]
-#         ), "Num layers not equal to num hidden states"
-#         norm_weights = torch.nn.functional.softmax(self.weights, dim=-1)
-#         # Layernorming the layers representations if asked
-#         if self.layernorm:
-#             hidden_states = [
-#                 F.layer_norm(t, (t.shape[-1],)) for t in hidden_states
-#             ]
-#         # Summing the weighted layers
-#         weighted_feats = hidden_states[0] * norm_weights[0]
-#         for i in range(1, len(hidden_states)):                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
-#             weighted_feats += hidden_states[i] * norm_weights[i]                                                                                                                                                                                                         
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
-#         return weighted_feats 
 
 # Define training procedure
 class ASR(sb.Brain):
@@ -246,32 +187,104 @@ class ASR(sb.Brain):
         self.model_optimizer.zero_grad(set_to_none)
         self.weights_optimizer.zero_grad(set_to_none)
 
+    def transcribe_dataset(self, dataset, min_key, loader_kwargs):
+        # If dataset isn't a Dataloader, we create it. 
+        if not isinstance(dataset, DataLoader):
+            loader_kwargs["ckpt_prefix"] = None
+            dataset = self.make_dataloader(
+                dataset, sb.Stage.TEST, **loader_kwargs
+            )
 
-def dataio_prepare(hparams):
+        self.on_evaluate_start(min_key=min_key) # We call the on_evaluate_start that will load the best model
+        self.modules.eval() # We set the model to eval mode (remove dropout etc)
+
+        # Now we iterate over the dataset and we simply compute_forward and decode
+        with torch.no_grad():
+
+            transcripts = []
+            truth = []
+            for batch in tqdm(dataset, dynamic_ncols=True):
+                # Make sure that your compute_forward returns the predictions !!!
+                logits, _ = self.compute_forward(batch, stage=sb.Stage.TEST) 
+                predicted = logits.max(1).indices.view(logits.size(0), 1).tolist()
+                
+                transcripts += predicted
+                truth += [[int(b) for b in a] for a in batch.phn_list]
+
+        return transcripts, truth
+
+
+# def dataio_prepare(hparams):
+#     """This function prepares the datasets to be used in the brain class.
+#     It also defines the data processing pipeline through user-defined functions."""
+#     data_folder = hparams["data_folder"]
+
+#     train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
+#         csv_path=hparams["train_csv"], replacements={"data_folder": data_folder},
+#     )
+
+#     # we sort training data to speed up training and get better results.
+#     train_data = train_data.filtered_sorted(sort_key="wav")
+#     hparams["train_dataloader_opts"]["shuffle"] = False
+
+#     valid_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
+#         csv_path=hparams["valid_csv"], replacements={"data_folder": data_folder},
+#     )
+#     valid_data = valid_data.filtered_sorted(sort_key="wav")
+
+#     # test is separate
+#     test_dataset = sb.dataio.dataset.DynamicItemDataset.from_csv(
+#         csv_path=hparams["test_csv"], replacements={"data_folder": data_folder},
+#     )
+#     test_dataset = test_dataset.filtered_sorted(sort_key="wav")
+
+#     datasets = [train_data, valid_data, test_dataset]
+
+#     # 2. Define audio pipeline:
+#     @sb.utils.data_pipeline.takes("wav", "start")
+#     @sb.utils.data_pipeline.provides("sig")
+#     def audio_pipeline(wav, start):
+#         # TODO Also care about what happens if the segment is located at the end of an audio!
+#         fr: int = int(hparams["sample_rate"] / 1_000)
+#         start = max(0, int(start) * fr - (hparams["segment_length"] - 10) // 2)
+#         stop = start + hparams["segment_length"]
+
+#         sig = sb.dataio.dataio.read_audio(({
+#             "file": wav,
+#             "start": start,
+#             "stop": stop
+#         }))
+    
+#         return sig
+
+#     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
+
+#     # 3. Define text pipeline:
+#     @sb.utils.data_pipeline.takes("phn")
+#     @sb.utils.data_pipeline.provides("phn_list", "phn_encoded")
+#     def text_pipeline(phn):
+#         yield [phn]
+#         yield torch.LongTensor([int(phn)])
+
+#     sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
+
+#     # 4. Set output:
+#     sb.dataio.dataset.set_output_keys(
+#         datasets, ["id", "sig", "phn_list", "phn_encoded"],
+#     )
+
+#     return train_data, valid_data, test_dataset
+
+def dataio_prepare(hparams, hdatasets):
     """This function prepares the datasets to be used in the brain class.
     It also defines the data processing pipeline through user-defined functions."""
-    data_folder = hparams["data_folder"]
 
-    train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["train_csv"], replacements={"data_folder": data_folder},
+    transcription_dataset = sb.dataio.dataset.DynamicItemDataset.from_csv(
+        csv_path=hdatasets["transcription_dataset"], replacements={"data_folder": hdatasets["data_folder"]},
     )
+    transcription_dataset = transcription_dataset.filtered_sorted(sort_key="wav")
 
-    # we sort training data to speed up training and get better results.
-    train_data = train_data.filtered_sorted(sort_key="wav")
-    hparams["train_dataloader_opts"]["shuffle"] = False
-
-    valid_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["valid_csv"], replacements={"data_folder": data_folder},
-    )
-    valid_data = valid_data.filtered_sorted(sort_key="wav")
-
-    # test is separate
-    test_dataset = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["test_csv"], replacements={"data_folder": data_folder},
-    )
-    test_dataset = test_dataset.filtered_sorted(sort_key="wav")
-
-    datasets = [train_data, valid_data, test_dataset]
+    datasets = [transcription_dataset]
 
     # 2. Define audio pipeline:
     @sb.utils.data_pipeline.takes("wav", "start")
@@ -280,7 +293,7 @@ def dataio_prepare(hparams):
         # TODO Also care about what happens if the segment is located at the end of an audio!
         fr: int = int(hparams["sample_rate"] / 1_000)
         start = max(0, int(start) * fr - (hparams["segment_length"] - 10) // 2)
-        stop = start + hparams["segment_length"]
+        stop = start + hparams["segment_length"] + 1
 
         sig = sb.dataio.dataio.read_audio(({
             "file": wav,
@@ -306,7 +319,7 @@ def dataio_prepare(hparams):
         datasets, ["id", "sig", "phn_list", "phn_encoded"],
     )
 
-    return train_data, valid_data, test_dataset
+    return transcription_dataset
 
 
 if __name__ == "__main__":
@@ -328,9 +341,9 @@ if __name__ == "__main__":
     )
 
     # here we create the datasets objects as well as tokenization and encoding
-    train_data, valid_data, test_dataset = dataio_prepare(
-        hparams
-    )
+    # train_data, valid_data, test_dataset = dataio_prepare(
+    #     hparams
+    # )
 
     # Trainer initialization
     asr_brain = ASR(
@@ -341,27 +354,43 @@ if __name__ == "__main__":
     )
 
     # We load the pretrained wav2vec2 model
-    if "pretrainer" in hparams.keys():
-        run_on_main(hparams["pretrainer"].collect_files)
-        hparams["pretrainer"].load_collected(asr_brain.device)
+    # if "pretrainer" in hparams.keys():
+    #     run_on_main(hparams["pretrainer"].collect_files)
+    #     hparams["pretrainer"].load_collected(asr_brain.device)
 
     # Training
-    asr_brain.fit(
-        asr_brain.hparams.epoch_counter,
-        train_data,
-        valid_data,
-        train_loader_kwargs=hparams["train_dataloader_opts"],
-        valid_loader_kwargs=hparams["valid_dataloader_opts"],
-    )
+    # asr_brain.fit(
+    #     asr_brain.hparams.epoch_counter,
+    #     train_data,
+    #     valid_data,
+    #     train_loader_kwargs=hparams["train_dataloader_opts"],
+    #     valid_loader_kwargs=hparams["valid_dataloader_opts"],
+    # )
 
     # Testing
-    if not os.path.exists(hparams["output_wer_folder"]):
-        os.makedirs(hparams["output_wer_folder"])
+    # if not os.path.exists(hparams["output_wer_folder"]):
+    #     os.makedirs(hparams["output_wer_folder"])
 
-    asr_brain.hparams.test_wer_file = os.path.join(hparams["output_wer_folder"], "wer_test.txt")
+    # asr_brain.hparams.test_wer_file = os.path.join(hparams["output_wer_folder"], "wer_test.txt")
 
-    asr_brain.evaluate(
-        test_dataset,
-        test_loader_kwargs=hparams["test_dataloader_opts"],
-        min_key="WER",
-    )
+    # asr_brain.evaluate(
+    #     test_dataset,
+    #     test_loader_kwargs=hparams["test_dataloader_opts"],
+    #     min_key="WER",
+    # )
+
+    for k, v in hparams["to_transcribe"].items():
+        transcription_dataset = dataio_prepare(hparams, v)
+        
+        transcripts, truth = asr_brain.transcribe_dataset(
+            dataset=transcription_dataset,  # Must be obtained from the dataio_function
+            min_key="WER",  # We load the model with the lowest WER
+            loader_kwargs=hparams["transcribe_dataloader_opts"], # opts for the dataloading
+        )
+
+        with open(hparams["output_transcription"].format(dataset=k), "w+") as f:
+            json.dump({
+                "labels": truth,
+                "predicted": transcripts
+            }, f)
+

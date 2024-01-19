@@ -8,6 +8,9 @@ import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main, if_main_process
 from hyperpyyaml import load_hyperpyyaml
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +57,6 @@ class ASR(sb.Brain):
             # Computing phoneme error rate
             predicted = logits.max(1).indices.view(logits.size(0), 1)
             predicted = [[str(element) for element in sublist] for sublist in predicted.tolist()]
-
-            # predicted = predicted.cpu().detach().numpy().astype(np.dtype.str).tolist()
             self.wer_metric.append(ids, predicted, batch.phn_list)  
 
         return loss
@@ -103,7 +104,6 @@ class ASR(sb.Brain):
         """Gets called at the beginning of each epoch"""
         if stage != sb.Stage.TRAIN:
             self.wer_metric = self.hparams.error_rate_computer()
-            # self.wer_metric = self.hparams.error_rate_computer()
 
     def on_stage_end(self, stage, stage_loss, epoch):
         """Gets called at the end of an epoch."""
@@ -113,7 +113,6 @@ class ASR(sb.Brain):
             self.train_stats = stage_stats
         else:
             stage_stats["WER"] = self.wer_metric.summarize("error_rate")
-            # stage_stats["WER"] = self.wer_metric.summarize("error_rate")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -177,32 +176,43 @@ class ASR(sb.Brain):
         self.wav2vec_optimizer.zero_grad(set_to_none)
         self.model_optimizer.zero_grad(set_to_none)
 
+    def transcribe_dataset(self, dataset, min_key, loader_kwargs):
+        # If dataset isn't a Dataloader, we create it. 
+        if not isinstance(dataset, DataLoader):
+            loader_kwargs["ckpt_prefix"] = None
+            dataset = self.make_dataloader(
+                dataset, sb.Stage.TEST, **loader_kwargs
+            )
 
-def dataio_prepare(hparams):
+        self.on_evaluate_start(min_key=min_key) # We call the on_evaluate_start that will load the best model
+        self.modules.eval() # We set the model to eval mode (remove dropout etc)
+
+        # Now we iterate over the dataset and we simply compute_forward and decode
+        with torch.no_grad():
+
+            transcripts = []
+            truth = []
+            for batch in tqdm(dataset, dynamic_ncols=True):
+                # Make sure that your compute_forward returns the predictions !!!
+                logits, _ = self.compute_forward(batch, stage=sb.Stage.TEST) 
+                predicted = logits.max(1).indices.view(logits.size(0), 1).tolist()
+                
+                transcripts += predicted
+                truth += [[int(b) for b in a] for a in batch.phn_list]
+
+        return transcripts, truth
+
+
+def dataio_prepare(hparams, hdatasets):
     """This function prepares the datasets to be used in the brain class.
     It also defines the data processing pipeline through user-defined functions."""
-    data_folder = hparams["data_folder"]
 
-    train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["train_csv"], replacements={"data_folder": data_folder},
+    transcription_dataset = sb.dataio.dataset.DynamicItemDataset.from_csv(
+        csv_path=hdatasets["transcription_dataset"], replacements={"data_folder": hdatasets["data_folder"]},
     )
+    transcription_dataset = transcription_dataset.filtered_sorted(sort_key="wav")
 
-    # we sort training data to speed up training and get better results.
-    train_data = train_data.filtered_sorted(sort_key="wav")
-    hparams["train_dataloader_opts"]["shuffle"] = False
-
-    valid_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["valid_csv"], replacements={"data_folder": data_folder},
-    )
-    valid_data = valid_data.filtered_sorted(sort_key="wav")
-
-    # test is separate
-    test_dataset = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["test_csv"], replacements={"data_folder": data_folder},
-    )
-    test_dataset = test_dataset.filtered_sorted(sort_key="wav")
-
-    datasets = [train_data, valid_data, test_dataset]
+    datasets = [transcription_dataset]
 
     # 2. Define audio pipeline:
     @sb.utils.data_pipeline.takes("wav", "start")
@@ -237,7 +247,7 @@ def dataio_prepare(hparams):
         datasets, ["id", "sig", "phn_list", "phn_encoded"],
     )
 
-    return train_data, valid_data, test_dataset
+    return transcription_dataset
 
 
 if __name__ == "__main__":
@@ -258,11 +268,6 @@ if __name__ == "__main__":
         overrides=overrides,
     )
 
-    # here we create the datasets objects as well as tokenization and encoding
-    train_data, valid_data, test_dataset = dataio_prepare(
-        hparams
-    )
-
     # Trainer initialization
     asr_brain = ASR(
         modules=hparams["modules"],
@@ -280,23 +285,39 @@ if __name__ == "__main__":
     # NB: This tokenizer corresponds to the one used for the LM!!
     # asr_brain.tokenizer = label_encoder
 
-    # Training
-    asr_brain.fit(
-        asr_brain.hparams.epoch_counter,
-        train_data,
-        valid_data,
-        train_loader_kwargs=hparams["train_dataloader_opts"],
-        valid_loader_kwargs=hparams["valid_dataloader_opts"],
-    )
+    # # Training
+    # asr_brain.fit(
+    #     asr_brain.hparams.epoch_counter,
+    #     train_data,
+    #     valid_data,
+    #     train_loader_kwargs=hparams["train_dataloader_opts"],
+    #     valid_loader_kwargs=hparams["valid_dataloader_opts"],
+    # )
 
-    # Testing
-    if not os.path.exists(hparams["output_wer_folder"]):
-        os.makedirs(hparams["output_wer_folder"])
+    # # Testing
+    # if not os.path.exists(hparams["output_wer_folder"]):
+    #     os.makedirs(hparams["output_wer_folder"])
 
-    asr_brain.hparams.test_wer_file = os.path.join(hparams["output_wer_folder"], "wer_test.txt")
+    # asr_brain.hparams.test_wer_file = os.path.join(hparams["output_wer_folder"], "wer_test.txt")
 
-    asr_brain.evaluate(
-        test_dataset,
-        test_loader_kwargs=hparams["test_dataloader_opts"],
-        min_key="wER",
-    )
+    # asr_brain.evaluate(
+    #     test_dataset,
+    #     test_loader_kwargs=hparams["test_dataloader_opts"],
+    #     min_key="wER",
+    # )
+        
+
+    for k, v in hparams["to_transcribe"].items():
+        transcription_dataset = dataio_prepare(hparams, v)
+        
+        transcripts, truth = asr_brain.transcribe_dataset(
+            dataset=transcription_dataset,  # Must be obtained from the dataio_function
+            min_key="loss",  # We load the model with the lowest WER
+            loader_kwargs=hparams["transcribe_dataloader_opts"], # opts for the dataloading
+        )
+
+        with open(hparams["output_transcription"].format(dataset=k), "w+") as f:
+            json.dump({
+                "labels": truth,
+                "predicted": transcripts
+            }, f)

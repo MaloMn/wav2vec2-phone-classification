@@ -1,13 +1,11 @@
 # ################################
-# Model: wav2vec2 + DNN + CTC
-# Augmentation: SpecAugment
-# Authors: Sung-Lin Yeh 2021
+# Model: wav2vec2 + DNN
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 2002
+seed: 2014
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref results/unfrozen_14k/<seed>
+output_folder: !ref results/weighted-layers-frozen/<seed>
 output_wer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -33,15 +31,27 @@ to_transcribe:
 # Using the 14k wav2vec model fine-tuned on French language ONLY
 wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
 wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
-   
+
+# Weighted model
+weighted_ssl_model: !new:speechbrain.lobes.models.huggingface_wav2vec.WeightedSSLModel
+   encoder: !ref <wav2vec2>
+   num_layers: 25 # 24 transformer layers + 1 output layer
+
 # Data files
+data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
 ckpt_interval_minutes: 25 # save checkpoint every N min
+dataset_folder: /data/coros1/mmaisonneuve/datasets/bref
+train_csv: !ref <dataset_folder>/train.csv
+valid_csv: !ref <dataset_folder>/validation.csv
+test_csv: !ref <dataset_folder>/test.csv
 segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
 
 # Training parameters
-number_of_epochs: 15
+number_of_epochs: 25
 lr: 0.9
 lr_wav2vec: 0.0001
+lr_weights: 0.1
+
 sorting: ascending
 auto_mix_prec: False
 sample_rate: 16000
@@ -66,7 +76,7 @@ test_dataloader_opts:
 activation: !name:torch.nn.LeakyReLU
 dnn_layers: 3
 dnn_neurons: 1024
-freeze_wav2vec: False
+freeze_wav2vec: True
 
 # Outputs
 output_neurons: 32  # 31 phones and silence in BREF
@@ -82,10 +92,6 @@ use_language_modelling: False
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
    limit: !ref <number_of_epochs>
 
-augmentation: !new:speechbrain.lobes.augment.TimeDomainSpecAugment
-   sample_rate: !ref <sample_rate>
-   speeds: [95, 100, 105]
-
 enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
    input_shape: [null, 6144]
    activation: !ref <activation>
@@ -97,6 +103,8 @@ wav2vec2: !new:speechbrain.lobes.models.huggingface_wav2vec.HuggingFaceWav2Vec2
    output_norm: True
    freeze: !ref <freeze_wav2vec>
    save_path: !ref <wav2vec2_folder>
+   apply_spec_augment: False
+   output_all_hiddens: True
 
 ctc_lin: !new:speechbrain.nnet.linear.Linear
    input_size: !ref <dnn_neurons>
@@ -112,6 +120,7 @@ modules:
    wav2vec2: !ref <wav2vec2>
    enc: !ref <enc>
    ctc_lin: !ref <ctc_lin>
+   weighted_ssl_model: !ref <weighted_ssl_model>
 
 model: !new:torch.nn.ModuleList
    - [!ref <enc>, !ref <ctc_lin>]
@@ -124,6 +133,9 @@ model_opt_class: !name:torch.optim.Adadelta
 wav2vec_opt_class: !name:torch.optim.Adam
    lr: !ref <lr_wav2vec>
 
+weights_opt_class: !name:torch.optim.Adam
+    lr: !ref <lr_weights>
+
 lr_annealing_model: !new:speechbrain.nnet.schedulers.NewBobScheduler
    initial_value: !ref <lr>
    improvement_threshold: 0.0025
@@ -135,6 +147,11 @@ lr_annealing_wav2vec: !new:speechbrain.nnet.schedulers.NewBobScheduler
    improvement_threshold: 0.0025
    annealing_factor: 0.9
    patient: 0
+
+lr_annealing_weights: !new:speechbrain.nnet.schedulers.NewBobScheduler
+    initial_value: !ref <lr_weights>
+    improvement_threshold: 0.0025
+    annealing_factor: 0.9
 
 label_encoder: !new:speechbrain.dataio.encoder.CTCTextEncoder
 

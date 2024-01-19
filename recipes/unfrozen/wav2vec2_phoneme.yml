@@ -5,7 +5,9 @@
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 2001
+# seed: 2001 # WER used as target to minimize
+seed: 2002 # validation loss is the target to minimize when using a checkpoint
+# seed: 2003 # same as 2002 but with small datasets
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 output_folder: !ref results/unfrozen_14k/<seed>
 output_wer_folder: !ref <output_folder>/
@@ -20,13 +22,13 @@ wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
 data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
 ckpt_interval_minutes: 25 # save checkpoint every N min
 dataset_folder: /data/coros1/mmaisonneuve/datasets/bref
-train_csv: !ref <dataset_folder>/train.csv
-valid_csv: !ref <dataset_folder>/validation.csv
-test_csv: !ref <dataset_folder>/test.csv
+train_csv: !ref <dataset_folder>/train_small.csv
+valid_csv: !ref <dataset_folder>/validation_small.csv
+test_csv: !ref <dataset_folder>/test_small.csv
 segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
 
 # Training parameters
-number_of_epochs: 15
+number_of_epochs: 6
 lr: 0.9
 lr_wav2vec: 0.0001
 sorting: ascending
