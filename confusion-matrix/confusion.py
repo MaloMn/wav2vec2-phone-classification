@@ -1,3 +1,5 @@
+import re
+
 from sklearn.metrics import confusion_matrix, balanced_accuracy_score, accuracy_score
 import matplotlib.pyplot as plt
 import itertools
@@ -67,9 +69,9 @@ class Confusion:
                                       "n", "m", "ɲ", "p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"]
         self.phones_subset = phones_subset
 
-        if "bref/" in self.filepath:
+        if ".txt" in self.filepath:
             self.labels, self.predicted = reader_bref(self.filepath, self.numeric_phones)
-        elif "c2si/" in self.filepath:
+        elif ".json" in self.filepath:
             self.labels, self.predicted = reader_c2si(self.filepath, self.numeric_phones)
         else:
             raise Exception("This dataset is not supported yet.")
@@ -136,7 +138,8 @@ class Confusion:
         if "bref/" in self.filepath:
             title = "BREF"
         else:
-            title = self.filepath.replace("c2si/output_", "").replace(".json", "").replace("_", " ")
+            title = re.search(r'output_(.*)\.json', self.filepath).group(1).replace("_", " ")
+            # title = self.filepath.replace("c2si/output_", "").replace(".json", "").replace("_", " ")
         ax.set_title("Confusion Matrix - " + title, fontsize=20)
 
         labels = self.phones_subset if self.phones_subset is not None else self.label_names_organized
@@ -167,13 +170,64 @@ class Confusion:
 
 
 if __name__ == '__main__':
-    # Confusion("bref/cer_test_15_epochs.txt")
-    # Confusion("c2si/output_hc_dap.json")
-    # Confusion("c2si/output_hc_lec.json")
-    # Confusion("c2si/output_healthy_controls.json")
+    # # FROZEN
+    # Confusion("bref/frozen/output_test.json")
+    # Confusion("c2si/frozen/output_hc_dap.json")
+    # Confusion("c2si/frozen/output_hc_lec.json")
+    # Confusion("c2si/frozen/output_healthy_controls.json")
+    #
+    # # Oral / Nasal
+    # Confusion("c2si/frozen/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
+    # Confusion("bref/frozen/output_test.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
+    #
+    # # Obstruent
+    # Confusion("c2si/frozen/output_hc_lec.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
+    # Confusion("bref/frozen/output_test.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
+    #
+    # # UNFROZEN
+    # Confusion("c2si/unfrozen/output_hc_dap.json")
+    # Confusion("c2si/unfrozen/output_hc_lec.json")
+    # Confusion("c2si/unfrozen/output_hc.json")
+    # Confusion("bref/unfrozen/output_test.json")
+    #
+    # # Oral / Nasal
+    # Confusion("c2si/unfrozen/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
+    # Confusion("bref/unfrozen/output_test.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
+    #
+    # # Obstruent
+    # Confusion("c2si/unfrozen/output_hc_lec.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
+    # Confusion("bref/unfrozen/output_test.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
 
-    Confusion("c2si/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
-    Confusion("bref/cer_test_15_epochs.txt", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
+    # WEIGHTS
+    # Confusion("c2si/weights-global-training/output_hc_dap.json")
+    # Confusion("c2si/weights-global-training/output_hc_lec.json")
+    # Confusion("bref/weights-global-training/output_test.json")
+    #
+    # # Oral / Nasal
+    # Confusion("c2si/weights-global-training/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"],
+    #           "_oral_nasal")
+    # Confusion("bref/weights-global-training/output_test.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"],
+    #           "_oral_nasal")
+    #
+    # # Obstruent
+    # Confusion("c2si/weights-global-training/output_hc_lec.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"],
+    #           "_obstruent")
+    # Confusion("bref/weights-global-training/output_test.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"],
+    #           "_obstruent")
 
-    Confusion("c2si/output_hc_lec.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
-    Confusion("bref/cer_test_15_epochs.txt", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
+    # UNFROZEN - WITH MINIMAL VALIDATION LOSS
+    Confusion("c2si/unfrozen-loss/output_hc_dap.json")
+    Confusion("c2si/unfrozen-loss/output_hc_lec.json")
+    Confusion("bref/unfrozen-loss/output_test.json")
+
+    # Oral / Nasal
+    Confusion("c2si/unfrozen-loss/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"],
+              "_oral_nasal")
+    Confusion("bref/unfrozen-loss/output_test.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"],
+              "_oral_nasal")
+
+    # Obstruent
+    Confusion("c2si/unfrozen-loss/output_hc_lec.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"],
+              "_obstruent")
+    Confusion("bref/unfrozen-loss/output_test.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"],
+              "_obstruent")
