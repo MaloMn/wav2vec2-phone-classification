@@ -3,9 +3,9 @@
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 2014 # Model lebenchmark 14k large, output folder is "...-frozen"
+seed: 2002
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref results/weighted-layers-frozen/<seed>
+output_folder: !ref results/manual-weight-frozen/<seed>
 output_wer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -15,9 +15,11 @@ wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
 wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
 
 # Weighted model
-weighted_ssl_model: !new:speechbrain.lobes.models.huggingface_wav2vec.WeightedSSLModel
+weighted_ssl_model: !new:speechbrain.lobes.models.huggingface_wav2vec.ManualWeightSSL
    encoder: !ref <wav2vec2>
-   num_layers: 25 # 24 transformer layers + 1 output layer
+   num_layers: 25 # We only keep first 7 layers
+   # weights: [0.47680661, 0.18256586, 0.15041693, 0.08724419, 0.05310181, 0.03128413, 0.01858047]
+   weights: [0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04]
 
 # Data files
 data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
@@ -32,7 +34,6 @@ segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
 number_of_epochs: 25
 lr: 0.9
 lr_wav2vec: 0.0001
-lr_weights: 0.1
 
 sorting: ascending
 auto_mix_prec: False
@@ -115,9 +116,6 @@ model_opt_class: !name:torch.optim.Adadelta
 wav2vec_opt_class: !name:torch.optim.Adam
    lr: !ref <lr_wav2vec>
 
-weights_opt_class: !name:torch.optim.Adam
-    lr: !ref <lr_weights>
-
 lr_annealing_model: !new:speechbrain.nnet.schedulers.NewBobScheduler
    initial_value: !ref <lr>
    improvement_threshold: 0.0025
@@ -129,11 +127,6 @@ lr_annealing_wav2vec: !new:speechbrain.nnet.schedulers.NewBobScheduler
    improvement_threshold: 0.0025
    annealing_factor: 0.9
    patient: 0
-
-lr_annealing_weights: !new:speechbrain.nnet.schedulers.NewBobScheduler
-    initial_value: !ref <lr_weights>
-    improvement_threshold: 0.0025
-    annealing_factor: 0.9
 
 label_encoder: !new:speechbrain.dataio.encoder.CTCTextEncoder
 
@@ -151,6 +144,3 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
    save_file: !ref <train_log>
 
 error_rate_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
-
-cer_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
-   split_tokens: True

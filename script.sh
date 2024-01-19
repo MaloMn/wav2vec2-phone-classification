@@ -6,7 +6,7 @@
 #SBATCH --partition=gpu
 #SBATCH --gpus-per-node=1
 #SBATCH --mem=16G
-#SBATCH --time=4:00:00
+#SBATCH --time=24:00:00
 #SBATCH --constraint='GPURAM_Min_16GB&GPURAM_Max_32GB'
 
 echo "Activating environment wav2vec" > $1.txt

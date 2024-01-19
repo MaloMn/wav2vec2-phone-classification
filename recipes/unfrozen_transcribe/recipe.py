@@ -3,14 +3,14 @@
 import os
 import sys
 import torch
-import json
 import logging
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main, if_main_process
-from torch.utils.data import DataLoader
 from hyperpyyaml import load_hyperpyyaml
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
 from tqdm import tqdm
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +57,7 @@ class ASR(sb.Brain):
             # Computing phoneme error rate
             predicted = logits.max(1).indices.view(logits.size(0), 1)
             predicted = [[str(element) for element in sublist] for sublist in predicted.tolist()]
-
-            # predicted = predicted.cpu().detach().numpy().astype(np.dtype.str).tolist()
-            self.cer_metric.append(ids, predicted, batch.phn_list)  
+            self.wer_metric.append(ids, predicted, batch.phn_list)  
 
         return loss
 
@@ -105,8 +103,7 @@ class ASR(sb.Brain):
     def on_stage_start(self, stage, epoch):
         """Gets called at the beginning of each epoch"""
         if stage != sb.Stage.TRAIN:
-            self.cer_metric = self.hparams.cer_computer()
-            # self.wer_metric = self.hparams.error_rate_computer()
+            self.wer_metric = self.hparams.error_rate_computer()
 
     def on_stage_end(self, stage, stage_loss, epoch):
         """Gets called at the end of an epoch."""
@@ -115,8 +112,7 @@ class ASR(sb.Brain):
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
         else:
-            stage_stats["CER"] = self.cer_metric.summarize("error_rate")
-            # stage_stats["WER"] = self.wer_metric.summarize("error_rate")
+            stage_stats["WER"] = self.wer_metric.summarize("error_rate")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -142,7 +138,7 @@ class ASR(sb.Brain):
                 valid_stats=stage_stats,
             )
             self.checkpointer.save_and_keep_only(
-                meta={"CER": stage_stats["CER"]}, min_keys=["CER"],
+                meta={"WER": stage_stats["WER"]}, min_keys=["WER"],
             )
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -150,8 +146,8 @@ class ASR(sb.Brain):
                 test_stats=stage_stats,
             )
             if if_main_process():
-                with open(self.hparams.test_cer_file, "w") as w:
-                    self.cer_metric.write_stats(w)
+                with open(self.hparams.test_wer_file, "w") as w:
+                    self.wer_metric.write_stats(w)
 
     def init_optimizers(self):
         "Initializes the wav2vec2 optimizer and model optimizer"
@@ -255,6 +251,8 @@ def dataio_prepare(hparams, hdatasets):
 
 
 if __name__ == "__main__":
+
+    # CLI:
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
 
     # create ddp_group with the right communication protocol
@@ -278,12 +276,43 @@ if __name__ == "__main__":
         checkpointer=hparams["checkpointer"],
     )
 
+    # We load the pretrained wav2vec2 model
+    if "pretrainer" in hparams.keys():
+        run_on_main(hparams["pretrainer"].collect_files)
+        hparams["pretrainer"].load_collected(asr_brain.device)
+
+    # We dynamicaly add the tokenizer to our brain class.
+    # NB: This tokenizer corresponds to the one used for the LM!!
+    # asr_brain.tokenizer = label_encoder
+
+    # # Training
+    # asr_brain.fit(
+    #     asr_brain.hparams.epoch_counter,
+    #     train_data,
+    #     valid_data,
+    #     train_loader_kwargs=hparams["train_dataloader_opts"],
+    #     valid_loader_kwargs=hparams["valid_dataloader_opts"],
+    # )
+
+    # # Testing
+    # if not os.path.exists(hparams["output_wer_folder"]):
+    #     os.makedirs(hparams["output_wer_folder"])
+
+    # asr_brain.hparams.test_wer_file = os.path.join(hparams["output_wer_folder"], "wer_test.txt")
+
+    # asr_brain.evaluate(
+    #     test_dataset,
+    #     test_loader_kwargs=hparams["test_dataloader_opts"],
+    #     min_key="wER",
+    # )
+        
+
     for k, v in hparams["to_transcribe"].items():
         transcription_dataset = dataio_prepare(hparams, v)
         
         transcripts, truth = asr_brain.transcribe_dataset(
             dataset=transcription_dataset,  # Must be obtained from the dataio_function
-            min_key="CER",  # We load the model with the lowest WER
+            min_key="loss",  # We load the model with the lowest WER
             loader_kwargs=hparams["transcribe_dataloader_opts"], # opts for the dataloading
         )
 

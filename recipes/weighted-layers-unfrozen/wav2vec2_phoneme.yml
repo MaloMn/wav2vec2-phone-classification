@@ -3,15 +3,17 @@
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 2014 # Model lebenchmark 14k large, output folder is "...-frozen"
+# seed: 2001 # trying to use a huggingface hosted model (works badly so far!)
+seed: 2002
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref results/weighted-layers-frozen/<seed>
+output_folder: !ref results/weighted-layers-unfrozen/<seed>
 output_wer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
 # Using the 14k wav2vec model fine-tuned on French language ONLY
-wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
+# wav2vec2_hub: malomn/lebenchmark-phoneme-classification
+wav2vec2_hub: /data/coros1/mmaisonneuve/wav2vec2-phoneme-classification/results/unfrozen_14k/2001/save/CKPT+2024-01-10+00-33-52+00/ 
 wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
 
 # Weighted model
@@ -151,6 +153,3 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
    save_file: !ref <train_log>
 
 error_rate_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
-
-cer_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
-   split_tokens: True
