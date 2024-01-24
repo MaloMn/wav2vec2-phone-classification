@@ -83,7 +83,6 @@ enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
 
 wav2vec2: !new:speechbrain.lobes.models.huggingface_wav2vec.HuggingFaceWav2Vec2
    source: !ref <wav2vec2_hub>
-   output_norm: True
    freeze: !ref <freeze_wav2vec>
    save_path: !ref <wav2vec2_folder>
 

@@ -6,6 +6,7 @@
 seed: 2014
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 output_folder: !ref results/weighted-layers-frozen/<seed>
+# output_folder: !ref results/manual-weight-frozen/<seed>
 output_wer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -13,6 +14,7 @@ train_log: !ref <output_folder>/train_log.txt
 output_transcription: !ref <output_folder>/output_{dataset}.json
 transcribe_dataloader_opts:
    batch_size: !ref <test_batch_size>
+
 
 to_transcribe:
    test: 

@@ -11,6 +11,24 @@ output_wer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
+output_transcription: !ref <output_folder>/output_{dataset}.json
+transcribe_dataloader_opts:
+   batch_size: !ref <test_batch_size>
+
+to_transcribe:
+   test: 
+      data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/bref/test.csv
+   hc_lec:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-lec-without-alp-test.csv
+   hc_dap:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-dap-without-alp-test.csv
+   # hc:
+   #    data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+   #    transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-test.csv
+
 # Using the 14k wav2vec model fine-tuned on French language ONLY
 # wav2vec2_hub: malomn/lebenchmark-phoneme-classification
 wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large

@@ -9,12 +9,65 @@ from speechbrain.utils.distributed import run_on_main, if_main_process
 from hyperpyyaml import load_hyperpyyaml
 import torch.nn.functional as F
 
+import numpy as np
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import json
 
 logger = logging.getLogger(__name__)
 
+
+class ManualWeightSSL(torch.nn.Module):
+    """This lobe enables the integration of use of weighted sum representations
+    from different layers in a SSL encoder.
+
+    The model can be used as a fixed feature extractor for SSL benchmarking. It
+    will download automatically the model from HuggingFace or use a local path.
+
+    More details in recipes/SSL_benchmark
+
+    Arguments
+    ---------
+    hub : str
+        HuggingFace hub name: e.g "facebook/wav2vec2-large-lv60"
+    num_layers: int
+        Number of internal layers: e.g 13 for "Base" models.
+    layernorm: bool
+        Whether layer representations should be layernormed before sum
+    Example
+    -------
+    >>> inputs = torch.rand([10, ])
+    >>> model_hub = "facebook/wav2vec2-base-h"
+    >>> num_layers = 13
+    >>> model = WeightedSSLModel(model_hub, num_layers)
+    >>> outputs = model(inputs)
+    """
+
+    def __init__(self, encoder, num_layers, weights):
+        super().__init__()
+        self.encoder = encoder
+        self.num_layers = num_layers
+        self.weights = np.array(weights)
+
+    def forward(self, wav, wav_lens=None):
+        """This method outputs a weighted sum of the layers representations of the SSL encoder
+        Arguments
+        ---------
+        wav : tensor
+            The wavs
+        """
+        hidden_states = self.encoder(wav)
+  
+        # Keeping only the specified layers
+        hidden_states = hidden_states[:len(self.weights), :, :, :]
+        assert (self.num_layers == hidden_states.shape[0]), "Num layers not equal to num hidden states"
+
+        # Summing the weighted layers
+        weighted_feats = hidden_states[0] * self.weights[0]
+        for i in range(1, len(hidden_states)):
+            weighted_feats += hidden_states[i] * self.weights[i]
+
+        return weighted_feats
 
 # Define training procedure
 class ASR(sb.Brain):
@@ -59,7 +112,6 @@ class ASR(sb.Brain):
         if self.auto_mix_prec:
             # self.wav2vec_optimizer.zero_grad()
             self.model_optimizer.zero_grad()
-            self.weights_optimizer.zero_grad()
 
             with torch.cuda.amp.autocast():
                 with self.no_sync():
@@ -75,7 +127,6 @@ class ASR(sb.Brain):
                 #     self.scaler.unscale_(self.wav2vec_optimizer)
 
                 self.scaler.unscale_(self.model_optimizer)
-                self.scaler.unscale_(self.weights_optimizer)
 
                 if self.check_gradients(loss):
                     # self.scaler.step(self.wav2vec_optimizer)
@@ -94,11 +145,9 @@ class ASR(sb.Brain):
                 if self.check_gradients(loss):
                     # self.wav2vec_optimizer.step()
                     self.model_optimizer.step()
-                    self.weights_optimizer.step()
 
                 # self.wav2vec_optimizer.zero_grad()
                 self.model_optimizer.zero_grad()
-                self.weights_optimizer.zero_grad()
                 
                 self.optimizer_step += 1
 
@@ -128,17 +177,10 @@ class ASR(sb.Brain):
             sb.nnet.schedulers.update_learning_rate(self.model_optimizer, new_lr_model)
             # sb.nnet.schedulers.update_learning_rate(self.wav2vec_optimizer, new_lr_wav2vec)
 
-            old_lr_encoder, new_lr_encoder = self.hparams.lr_annealing_weights(stage_stats["loss"])
-            sb.nnet.schedulers.update_learning_rate(self.weights_optimizer, new_lr_encoder)
-
-            print(self.modules.weighted_ssl_model.weights)
-
             self.hparams.train_logger.log_stats(
                 stats_meta={
                     "epoch": epoch,
                     "lr_model": old_lr_model,
-                    # "lr_wav2vec": old_lr_wav2vec,
-                    "lr_weights": old_lr_encoder
                 },
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
@@ -168,10 +210,6 @@ class ASR(sb.Brain):
         #         self.modules.wav2vec2.parameters()
         #     )
 
-        self.weights_optimizer = self.hparams.weights_opt_class(
-            [self.modules.weighted_ssl_model.weights]
-        )
-
         self.model_optimizer = self.hparams.model_opt_class(
             self.hparams.model.parameters()
         )
@@ -179,12 +217,10 @@ class ASR(sb.Brain):
         if self.checkpointer is not None:
             # self.checkpointer.add_recoverable("wav2vec_opt", self.wav2vec_optimizer)
             self.checkpointer.add_recoverable("modelopt", self.model_optimizer)
-            self.checkpointer.add_recoverable("weights_opt", self.weights_optimizer)
 
     def zero_grad(self, set_to_none=False):
         # self.wav2vec_optimizer.zero_grad(set_to_none)
         self.model_optimizer.zero_grad(set_to_none)
-        self.weights_optimizer.zero_grad(set_to_none)
 
     def transcribe_dataset(self, dataset, min_key, loader_kwargs):
         # If dataset isn't a Dataloader, we create it. 
@@ -211,7 +247,7 @@ class ASR(sb.Brain):
                 truth += [[int(b) for b in a] for a in batch.phn_list]
 
         return transcripts, truth
-
+    
 
 # def dataio_prepare(hparams):
 #     """This function prepares the datasets to be used in the brain class.
@@ -273,6 +309,7 @@ class ASR(sb.Brain):
 #     )
 
 #     return train_data, valid_data, test_dataset
+    
 
 def dataio_prepare(hparams, hdatasets):
     """This function prepares the datasets to be used in the brain class.
@@ -353,9 +390,9 @@ if __name__ == "__main__":
     )
 
     # We load the pretrained wav2vec2 model
-    # if "pretrainer" in hparams.keys():
-    #     run_on_main(hparams["pretrainer"].collect_files)
-    #     hparams["pretrainer"].load_collected(asr_brain.device)
+    if "pretrainer" in hparams.keys():
+        run_on_main(hparams["pretrainer"].collect_files)
+        hparams["pretrainer"].load_collected(asr_brain.device)
 
     # Training
     # asr_brain.fit(
@@ -367,8 +404,8 @@ if __name__ == "__main__":
     # )
 
     # Testing
-    # if not os.path.exists(hparams["output_wer_folder"]):
-    #     os.makedirs(hparams["output_wer_folder"])
+    if not os.path.exists(hparams["output_wer_folder"]):
+        os.makedirs(hparams["output_wer_folder"])
 
     # asr_brain.hparams.test_wer_file = os.path.join(hparams["output_wer_folder"], "wer_test.txt")
 
@@ -392,4 +429,3 @@ if __name__ == "__main__":
                 "labels": truth,
                 "predicted": transcripts
             }, f)
-

@@ -3,7 +3,8 @@
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 2002
+# seed: 2002 # Baseline
+seed: 2003 # Real weights from frozen weight training
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 output_folder: !ref results/manual-weight-frozen/<seed>
 output_wer_folder: !ref <output_folder>/
@@ -18,8 +19,8 @@ wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
 weighted_ssl_model: !new:speechbrain.lobes.models.huggingface_wav2vec.ManualWeightSSL
    encoder: !ref <wav2vec2>
    num_layers: 25 # We only keep first 7 layers
-   # weights: [0.47680661, 0.18256586, 0.15041693, 0.08724419, 0.05310181, 0.03128413, 0.01858047]
-   weights: [0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04]
+   weights: [0.46435494833391294, 0.177798206284396, 0.14648883803098847, 0.08496583501069323, 0.05171507032261811, 0.030467155503614847, 0.018095245688773975, 0.009561544137121784, 0.002275612472018267, 8.32176772830867e-08, 1.3702246433004743e-08, 4.372608722223313e-09, 2.0839388744940237e-09, 1.6218375436054314e-09, 1.4146183715071671e-09, 1.1938218417873911e-09, 1.1145600940783051e-09, 1.242542635398521e-09, 1.2359745801520252e-09, 1.3761087813554108e-09, 1.9892541959860627e-09, 4.1956983271303145e-09, 1.757996308813791e-08, 0.00024107413821274908, 0.014036333736798806]
+   # weights: [0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04]
 
 # Data files
 data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
