@@ -169,65 +169,30 @@ class Confusion:
             print(f"Confusion matrix was saved at {self.output_png}")
 
 
+def launch(folder, *args):
+    if 'bref' in args:
+        Confusion(f"bref/{folder}/output_test.json")
+    if 'dap' in args:
+        Confusion(f"c2si/{folder}/output_hc_dap.json")
+    if 'lec' in args:
+        Confusion(f"c2si/{folder}/output_hc_lec.json")
+    if 'hc' in args:
+        Confusion(f"c2si/{folder}/output_healthy_controls.json")
+
+    if 'oral-nasal' in args:
+        Confusion(f"c2si/{folder}/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
+        Confusion(f"bref/{folder}/output_test.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
+
+    if 'obstruent' in args:
+        Confusion(f"c2si/{folder}/output_hc_lec.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
+        Confusion(f"bref/{folder}/output_test.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
+
+
 if __name__ == '__main__':
-    # # FROZEN
-    # Confusion("bref/frozen/output_test.json")
-    # Confusion("c2si/frozen/output_hc_dap.json")
-    # Confusion("c2si/frozen/output_hc_lec.json")
-    # Confusion("c2si/frozen/output_healthy_controls.json")
-    #
-    # # Oral / Nasal
-    # Confusion("c2si/frozen/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
-    # Confusion("bref/frozen/output_test.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
-    #
-    # # Obstruent
-    # Confusion("c2si/frozen/output_hc_lec.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
-    # Confusion("bref/frozen/output_test.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
-    #
-    # # UNFROZEN
-    # Confusion("c2si/unfrozen/output_hc_dap.json")
-    # Confusion("c2si/unfrozen/output_hc_lec.json")
-    # Confusion("c2si/unfrozen/output_hc.json")
-    # Confusion("bref/unfrozen/output_test.json")
-    #
-    # # Oral / Nasal
-    # Confusion("c2si/unfrozen/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
-    # Confusion("bref/unfrozen/output_test.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
-    #
-    # # Obstruent
-    # Confusion("c2si/unfrozen/output_hc_lec.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
-    # Confusion("bref/unfrozen/output_test.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
-
-    # WEIGHTS
-    # Confusion("c2si/weights-global-training/output_hc_dap.json")
-    # Confusion("c2si/weights-global-training/output_hc_lec.json")
-    # Confusion("bref/weights-global-training/output_test.json")
-    #
-    # # Oral / Nasal
-    # Confusion("c2si/weights-global-training/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"],
-    #           "_oral_nasal")
-    # Confusion("bref/weights-global-training/output_test.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"],
-    #           "_oral_nasal")
-    #
-    # # Obstruent
-    # Confusion("c2si/weights-global-training/output_hc_lec.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"],
-    #           "_obstruent")
-    # Confusion("bref/weights-global-training/output_test.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"],
-    #           "_obstruent")
-
-    # UNFROZEN - WITH MINIMAL VALIDATION LOSS
-    Confusion("c2si/unfrozen-loss/output_hc_dap.json")
-    Confusion("c2si/unfrozen-loss/output_hc_lec.json")
-    Confusion("bref/unfrozen-loss/output_test.json")
-
-    # Oral / Nasal
-    Confusion("c2si/unfrozen-loss/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"],
-              "_oral_nasal")
-    Confusion("bref/unfrozen-loss/output_test.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"],
-              "_oral_nasal")
-
-    # Obstruent
-    Confusion("c2si/unfrozen-loss/output_hc_lec.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"],
-              "_obstruent")
-    Confusion("bref/unfrozen-loss/output_test.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"],
-              "_obstruent")
+    # launch('frozen', 'bref', 'dap', 'lec', 'hc', 'oral-nasal', 'obstruent')  # FROZEN
+    # launch('unfrozen', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # UNFROZEN
+    # launch('weights-global-training', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS
+    # launch('unfrozen-loss', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # UNFROZEN - WITH MINIMAL VALIDATION LOSS
+    # launch('weights-baseline', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - BASELINE (UNIFORM WEIGHTS DISTRIBUTION)
+    # launch('weights-unfrozen', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
+    launch('weights-frozen', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
