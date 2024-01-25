@@ -9,6 +9,11 @@ from speechbrain.utils.distributed import run_on_main, if_main_process
 from hyperpyyaml import load_hyperpyyaml
 import torch.nn.functional as F
 
+from torch.utils.data import DataLoader
+import torch.nn.functional as F
+from tqdm import tqdm
+import json
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,7 +61,7 @@ class ASR(sb.Brain):
             predicted = [[str(element) for element in sublist] for sublist in predicted.tolist()]
 
             # predicted = predicted.cpu().detach().numpy().astype(np.dtype.str).tolist()
-            self.cer_metric.append(ids, predicted, batch.phn_list)  
+            self.wer_metric.append(ids, predicted, batch.phn_list)  
 
         return loss
 
@@ -102,8 +107,8 @@ class ASR(sb.Brain):
     def on_stage_start(self, stage, epoch):
         """Gets called at the beginning of each epoch"""
         if stage != sb.Stage.TRAIN:
-            self.cer_metric = self.hparams.cer_computer()
-            # self.wer_metric = self.hparams.error_rate_computer()
+            # self.cer_metric = self.hparams.cer_computer()
+            self.wer_metric = self.hparams.error_rate_computer()
 
     def on_stage_end(self, stage, stage_loss, epoch):
         """Gets called at the end of an epoch."""
@@ -112,8 +117,8 @@ class ASR(sb.Brain):
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
         else:
-            stage_stats["CER"] = self.cer_metric.summarize("error_rate")
-            # stage_stats["WER"] = self.wer_metric.summarize("error_rate")
+            # stage_stats["CER"] = self.cer_metric.summarize("error_rate")
+            stage_stats["WER"] = self.wer_metric.summarize("error_rate")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -139,7 +144,7 @@ class ASR(sb.Brain):
                 valid_stats=stage_stats,
             )
             self.checkpointer.save_and_keep_only(
-                meta={"CER": stage_stats["CER"]}, min_keys=["CER"],
+                meta={"WER": stage_stats["WER"]}, min_keys=["WER"],
             )
         elif stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -147,8 +152,8 @@ class ASR(sb.Brain):
                 test_stats=stage_stats,
             )
             if if_main_process():
-                with open(self.hparams.test_cer_file, "w") as w:
-                    self.cer_metric.write_stats(w)
+                with open(self.hparams.test_wer_file, "w") as w:
+                    self.wer_metric.write_stats(w)
 
     def init_optimizers(self):
         "Initializes the wav2vec2 optimizer and model optimizer"
@@ -176,6 +181,32 @@ class ASR(sb.Brain):
     def zero_grad(self, set_to_none=False):
         self.wav2vec_optimizer.zero_grad(set_to_none)
         self.model_optimizer.zero_grad(set_to_none)
+
+    def transcribe_dataset(self, dataset, min_key, loader_kwargs):
+        # If dataset isn't a Dataloader, we create it. 
+        if not isinstance(dataset, DataLoader):
+            loader_kwargs["ckpt_prefix"] = None
+            dataset = self.make_dataloader(
+                dataset, sb.Stage.TEST, **loader_kwargs
+            )
+
+        self.on_evaluate_start(min_key=min_key) # We call the on_evaluate_start that will load the best model
+        self.modules.eval() # We set the model to eval mode (remove dropout etc)
+
+        # Now we iterate over the dataset and we simply compute_forward and decode
+        with torch.no_grad():
+
+            transcripts = []
+            truth = []
+            for batch in tqdm(dataset, dynamic_ncols=True):
+                # Make sure that your compute_forward returns the predictions !!!
+                logits, _ = self.compute_forward(batch, stage=sb.Stage.TEST) 
+                predicted = logits.max(1).indices.view(logits.size(0), 1).tolist()
+                
+                transcripts += predicted
+                truth += [[int(b) for b in a] for a in batch.phn_list]
+
+        return transcripts, truth
 
 
 def dataio_prepare(hparams):
@@ -211,7 +242,7 @@ def dataio_prepare(hparams):
         # TODO Also care about what happens if the segment is located at the end of an audio!
         fr: int = int(hparams["sample_rate"] / 1_000)
         start = max(0, int(start) * fr - (hparams["segment_length"] - 10) // 2)
-        stop = start + hparams["segment_length"] + 1
+        stop = start + hparams["segment_length"]
 
         sig = sb.dataio.dataio.read_audio(({
             "file": wav,
@@ -238,6 +269,53 @@ def dataio_prepare(hparams):
     )
 
     return train_data, valid_data, test_dataset
+
+
+def dataio_prepare_transcript(hparams, hdatasets):
+    """This function prepares the datasets to be used in the brain class.
+    It also defines the data processing pipeline through user-defined functions."""
+
+    transcription_dataset = sb.dataio.dataset.DynamicItemDataset.from_csv(
+        csv_path=hdatasets["transcription_dataset"], replacements={"data_folder": hdatasets["data_folder"]},
+    )
+    transcription_dataset = transcription_dataset.filtered_sorted(sort_key="wav")
+
+    datasets = [transcription_dataset]
+
+    # 2. Define audio pipeline:
+    @sb.utils.data_pipeline.takes("wav", "start")
+    @sb.utils.data_pipeline.provides("sig")
+    def audio_pipeline(wav, start):
+        # TODO Also care about what happens if the segment is located at the end of an audio!
+        fr: int = int(hparams["sample_rate"] / 1_000)
+        start = max(0, int(start) * fr - (hparams["segment_length"] - 10) // 2)
+        stop = start + hparams["segment_length"] + 1
+
+        sig = sb.dataio.dataio.read_audio(({
+            "file": wav,
+            "start": start,
+            "stop": stop
+        }))
+    
+        return sig
+
+    sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
+
+    # 3. Define text pipeline:
+    @sb.utils.data_pipeline.takes("phn")
+    @sb.utils.data_pipeline.provides("phn_list", "phn_encoded")
+    def text_pipeline(phn):
+        yield [phn]
+        yield torch.LongTensor([int(phn)])
+
+    sb.dataio.dataset.add_dynamic_item(datasets, text_pipeline)
+
+    # 4. Set output:
+    sb.dataio.dataset.set_output_keys(
+        datasets, ["id", "sig", "phn_list", "phn_encoded"],
+    )
+
+    return transcription_dataset
 
 
 if __name__ == "__main__":
@@ -290,13 +368,28 @@ if __name__ == "__main__":
     )
 
     # Testing
-    if not os.path.exists(hparams["output_cer_folder"]):
-        os.makedirs(hparams["output_cer_folder"])
+    if not os.path.exists(hparams["output_wer_folder"]):
+        os.makedirs(hparams["output_wer_folder"])
 
-    asr_brain.hparams.test_cer_file = os.path.join(hparams["output_cer_folder"], "cer_test.txt")
+    asr_brain.hparams.test_wer_file = os.path.join(hparams["output_wer_folder"], "wer_test.txt")
 
     asr_brain.evaluate(
         test_dataset,
         test_loader_kwargs=hparams["test_dataloader_opts"],
-        min_key="CER",
+        min_key="WER",
     )
+
+    for k, v in hparams["to_transcribe"].items():
+        transcription_dataset = dataio_prepare_transcript(hparams, v)
+        
+        transcripts, truth = asr_brain.transcribe_dataset(
+            dataset=transcription_dataset,  # Must be obtained from the dataio_function
+            min_key="WER",  # We load the model with the lowest WER
+            loader_kwargs=hparams["transcribe_dataloader_opts"], # opts for the dataloading
+        )
+
+        with open(hparams["output_transcription"].format(dataset=k), "w+") as f:
+            json.dump({
+                "labels": truth,
+                "predicted": transcripts
+            }, f)
