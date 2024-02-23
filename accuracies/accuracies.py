@@ -7,6 +7,13 @@ import numpy as np
 import json
 
 
+def warn(*args, **kwargs):
+    pass
+
+import warnings
+
+warnings.warn = warn
+
 def reader_bref(filepath, numeric_phones):
     def translator(character):
         character = character.replace(" ; ", "").replace(" ", "").replace("<eps>", "")
@@ -64,7 +71,7 @@ class Confusion:
             self.phones = json.load(f)
 
         self.filepath = filepath
-        self.output_png = self.filepath.split(".")[0] + output_suffix + ".pdf"
+        self.output_png = self.filepath.split(".")[0] + output_suffix + ".png"
         self.label_names_organized = ["sil", "a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "w", "ɥ", "j", "l", "ʁ",
                                       "n", "m", "ɲ", "p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"]
         self.phones_subset = phones_subset
@@ -77,8 +84,8 @@ class Confusion:
             raise Exception("This dataset is not supported yet.")
 
         self.accuracy, self.balanced = self.get_accuracies()
-        self.confusion_matrix = self.compute_confusion_matrix()
-        self.plot_confusion_matrix()
+        # self.confusion_matrix = self.compute_confusion_matrix()
+        # self.plot_confusion_matrix()
 
     def get_accuracies(self, save=True):
         # Remove silences
@@ -125,7 +132,6 @@ class Confusion:
         return cm
 
     def plot_confusion_matrix(self, savefig=True, file='', cmap=plt.cm.Greys):
-        # print(self.confusion_matrix)
         fig, ax = plt.subplots(dpi=125)
         fig.set_size_inches(15, 12, forward=True)
 
@@ -162,7 +168,7 @@ class Confusion:
                     ha="center", va="center", color=color, fontsize=fontsize, weight='bold')
 
         plt.tight_layout(pad=3)
-        ax.set_ylabel('Ground truth', fontsize=18, weight='bold')
+        ax.set_ylabel('True labels', fontsize=18, weight='bold')
         ax.set_xlabel('Predicted labels', fontsize=18, weight='bold')
 
         if savefig:
@@ -170,52 +176,25 @@ class Confusion:
             print(f"Confusion matrix was saved at {self.output_png}")
 
 
-def launch(folder, *args):
-    if 'bref' in args:
-        Confusion(f"bref/{folder}/output_test.json")
-    if 'dap' in args:
-        Confusion(f"c2si/{folder}/output_hc_dap.json")
-    if 'lec' in args:
-        Confusion(f"c2si/{folder}/output_hc_lec.json")
-    if 'hc' in args:
-        Confusion(f"c2si/{folder}/output_healthy_controls.json")
-
-    if 'oral-nasal' in args:
-        Confusion(f"c2si/{folder}/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
-        Confusion(f"bref/{folder}/output_test.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
-
-    if 'obstruent' in args:
-        Confusion(f"c2si/{folder}/output_hc_lec.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
-        Confusion(f"bref/{folder}/output_test.json", ["p", "t", "k", "b", "d", "g", "f", "s", "ʃ", "v", "z", "ʒ"], "_obstruent")
-
-
 if __name__ == '__main__':
-    # launch('frozen',      'obstruent')  # FROZEN
-    # launch('frozen', 'bref', 'dap', 'lec', 'hc', 'oral-nasal', 'obstruent')  # FROZEN
-    # launch('unfrozen', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # UNFROZEN
-    # launch('weights-global-training', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS
-    # launch('unfrozen-loss', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # UNFROZEN - WITH MINIMAL VALIDATION LOSS
-    # launch('weights-baseline', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - BASELINE (UNIFORM WEIGHTS DISTRIBUTION)
-    # launch('weights-unfrozen', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    # launch('weights-frozen', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    # launch('unfrozen-3k-large', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    # launch('unfrozen-3k-base', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
+    import glob, re, csv
 
-    # launch('unfrozen-cp-3k-base', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    # launch('unfrozen-cp-3k-large', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    # launch('unfrozen-cp-14k-light', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    # launch('unfrozen-cp-14k-large', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    # launch('unfrozen-cp-1k', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    # launch('unfrozen-1k', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
+    with open("c2si/patient-accuracies.csv", 'w', newline='') as csv_file:
+        # Create a CSV writer object
+        csv_writer = csv.writer(csv_file)
 
-    # launch('unfrozen-14k-light', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
+        # Write header if needed
+        header = ['ID', 'Accuracy']  # Replace with your actual column names
+        csv_writer.writerow(header)
 
-    # for i in range(1, 11):
-    #     launch(f'layers/{i}', 'bref', 'dap', 'lec')
+        for filename in glob.glob("c2si/lec-all/*-test.json"):
+            conf = Confusion(filename)
 
-    # launch('unfrozen-cp-3k-large-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    launch('unfrozen-cp-3k-large-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    # launch('unfrozen-cp-3k-base-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    # launch('unfrozen-cp-14k-large-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    # launch('unfrozen-cp-14k-light-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
+            patient_id = re.findall(r"-([-\d]+)-", filename)[0].split("-")
+            attempt = patient_id[1] if len(patient_id) > 1 else "1"
+            patient_id = patient_id[0]
 
+            # TIO-000334-01-L01
+
+            identifier = f"TIO-{patient_id.zfill(6)}-{attempt.zfill(2)}-L01"
+            csv_writer.writerow([identifier, conf.balanced])
