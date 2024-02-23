@@ -5,41 +5,52 @@
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 2003
+seed: 2001 # 3K-large
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref results/unfrozen_14k/<seed>
+output_folder: !ref results/unfrozen-cp/<seed>
 output_wer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
-output_transcription: !ref <output_folder>/output_{dataset}.json
+# output_transcription: !ref <output_folder>/output_{dataset}.json
+output_transcription: !ref <output_folder>/output-364-{dataset}.json
 transcribe_dataloader_opts:
    batch_size: !ref <test_batch_size>
 
+# to_transcribe:
+#    test: 
+#       data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
+#       transcription_dataset: /data/coros1/mmaisonneuve/datasets/bref/test.csv
+#    hc_lec:
+#       data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+#       transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-lec-without-alp-test.csv
+#    hc_dap:
+#       data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+#       transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-dap-without-alp-test.csv
+
 to_transcribe:
    test: 
-      data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
-      transcription_dataset: /data/coros1/mmaisonneuve/datasets/bref/test.csv
-   hc_lec:
       data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
-      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-lec-without-alp-test.csv
-   hc_dap:
-      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
-      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-dap-without-alp-test.csv
-   # hc:
-   #    data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
-   #    transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-test.csv
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-364-test.csv
 
 # Using the 14k wav2vec model fine-tuned on French language ONLY
-wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-light
+# wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
+wav2vec2_hub: LeBenchmark/wav2vec2-FR-3K-large
 wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
-   
+
 # Data files
+data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
+data_folder_cp: /data/coros1/mmaisonneuve/CommonPhone/CP/fr/wav # CommonPhone audios
+
 ckpt_interval_minutes: 25 # save checkpoint every N min
+dataset_folder: /data/coros1/mmaisonneuve/datasets/bref+cp
+train_csv: !ref <dataset_folder>/train.csv
+valid_csv: !ref <dataset_folder>/validation.csv
+test_csv: !ref <dataset_folder>/test.csv
 segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
 
 # Training parameters
-number_of_epochs: 15
+number_of_epochs: 15 
 lr: 0.9
 lr_wav2vec: 0.0001
 sorting: ascending
@@ -82,19 +93,15 @@ use_language_modelling: False
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
    limit: !ref <number_of_epochs>
 
-augmentation: !new:speechbrain.lobes.augment.TimeDomainSpecAugment
-   sample_rate: !ref <sample_rate>
-   speeds: [95, 100, 105]
-
 enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
-   input_shape: [null, 3072]
+   input_shape: [null, 6144] # large 1024 * 6
+   # input_shape: [null, 3072] # light 512 * 6
    activation: !ref <activation>
    dnn_blocks: !ref <dnn_layers>
    dnn_neurons: !ref <dnn_neurons>
 
 wav2vec2: !new:speechbrain.lobes.models.huggingface_wav2vec.HuggingFaceWav2Vec2
    source: !ref <wav2vec2_hub>
-   output_norm: True
    freeze: !ref <freeze_wav2vec>
    save_path: !ref <wav2vec2_folder>
 
@@ -152,6 +159,3 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
    save_file: !ref <train_log>
 
 error_rate_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
-
-cer_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
-   split_tokens: True
