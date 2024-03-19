@@ -32,6 +32,8 @@ def reader_c2si(filepath, numeric_phones):
     with open(filepath) as f:
         data = json.load(f)
 
+        print(len(data["labels"]))
+
     def translator(index):
         if index == 0:
             return "silence"
@@ -149,21 +151,21 @@ class Confusion:
         ax.set_xticks(tick_marks)
         ax.set_yticks(tick_marks)
 
-        fontsize = linear_mapping_function(1, 27, 31, 14)(len(labels))
+        fontsize = linear_mapping_function(1, 37, 31, 14)(len(labels))
         ax.set_xticklabels([f"/{a}/" for a in labels], fontsize=fontsize, weight='bold')
         ax.set_yticklabels([f"/{a}/" for a in labels], fontsize=fontsize, weight='bold')
 
         ax.grid(False)
 
-        fontsize = linear_mapping_function(1, 23, 31, 10)(len(labels))
+        fontsize = linear_mapping_function(1, 30, 31, 10)(len(labels))
         for i, j in itertools.product(range(self.confusion_matrix.shape[0]), range(self.confusion_matrix.shape[1])):
             color = "white" if self.confusion_matrix[i, j] > 0.6 else "black"
             ax.text(j, i, f'{self.confusion_matrix[i, j] * 100:.1f}',
                     ha="center", va="center", color=color, fontsize=fontsize, weight='bold')
 
         plt.tight_layout(pad=3)
-        ax.set_ylabel('Ground truth', fontsize=18, weight='bold')
-        ax.set_xlabel('Predicted labels', fontsize=18, weight='bold')
+        ax.set_ylabel('Ground truth', fontsize=30, weight='bold')
+        ax.set_xlabel('Predicted labels', fontsize=30, weight='bold')
 
         if savefig:
             plt.savefig(self.output_png, bbox_inches='tight', pad_inches=0.1)
@@ -214,8 +216,10 @@ if __name__ == '__main__':
     #     launch(f'layers/{i}', 'bref', 'dap', 'lec')
 
     # launch('unfrozen-cp-3k-large-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    launch('unfrozen-cp-3k-large-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
+    #launch('unfrozen-cp-3k-large-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
     # launch('unfrozen-cp-3k-base-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
     # launch('unfrozen-cp-14k-large-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
     # launch('unfrozen-cp-14k-light-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
+
+    launch('brefint-30', 'bref')
 
