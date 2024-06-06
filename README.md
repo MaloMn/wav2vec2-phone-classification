@@ -1,6 +1,6 @@
 # Phone Classification using Wav2Vec2
 
-This repository contains Speechbrain recipes to fine-tune Wav2Vec2 models on a phone classification task.
+This repository contains [Speechbrain](https://github.com/speechbrain/speechbrain) recipes to fine-tune Wav2Vec2 models on a phone classification task.
 It allows us to analyse the impact of:
   1. Fine-tuning Wav2Vec2,
   2. Pre-training datasets,
