@@ -14,13 +14,7 @@ Results obtained are available in the `confusion-matrix/` folder.
 
 If you use this work, please cite as:
 
-Maisonneuve, M. and Fredouille, C. and Lalain M. and Ghio A. and Woisard, V.
-"Towards objective and interpretable speech disorder assessment: a comparative analysis of CNN and transformer-based models", 
-in *Proc. Interspeech 2024*, 2024.
-
-or for bibtext:
-
-```bibtext
+```bib
 @inproceedings{maisonneuve24,
   author    = {Malo Maisonneuve and Corinne Fredouille and Muriel Lalain and Alain Ghio and Virginie Woisard},
   title     = {{Towards objective and interpretable speech disorder assessment: a comparative analysis of CNN and transformer-based models}},
