@@ -7,7 +7,7 @@
 # Seed needs to be set at top of yaml, before objects with parameters are made
 seed: 2001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref results/unfrozen-cp-lv-60-large-accents/<seed>
+output_folder: !ref results/unfrozen-cp-xlsr-53-large-accents/<seed>
 output_wer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -30,7 +30,7 @@ to_transcribe:
 
 # Using the 14k wav2vec model fine-tuned on French language ONLY
 # wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
-wav2vec2_hub: facebook/wav2vec2-lv-60-espeak-cv-ft
+wav2vec2_hub: facebook/wav2vec2-xlsr-53-espeak-cv-ft
 wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
 
 # Data files

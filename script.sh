@@ -5,9 +5,9 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=gpu
 #SBATCH --gpus-per-node=1
-#SBATCH --mem=10G
+#SBATCH --mem=15G
 #SBATCH --time=24:00:00
-#SBATCH --constraint='GPURAM_Min_16GB'
+#SBATCH --constraint='GPURAM_Min_24GB'
 
 echo "Activating environment wav2vec" > $1.txt
 conda activate wav2vec
