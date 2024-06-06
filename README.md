@@ -7,11 +7,15 @@ It allows us to analyse the impact of:
   3. Model size,
   4. fine-tuning datasets.
 
+## Code
 The `recipes` folder contains all Speechbrain recipes.
 Results obtained are available in the `confusion-matrix/` folder.
 
-## How to cite
+## Data
+For confidentiality reasons, datasets are not included.
+This work relies on the [C2SI](https://hal.science/hal-02921918), [CommonPhone](https://arxiv.org/abs/2201.05912) and [BREF](https://www.isca-archive.org/eurospeech_1991/larnel91_eurospeech.html) corpora. 
 
+## How to cite
 If you use this work, please cite as:
 
 ```bib
