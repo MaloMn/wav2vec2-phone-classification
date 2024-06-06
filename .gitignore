@@ -10,3 +10,4 @@ content/
 **/*_accuracies.json
 **/*.gif
 recipes/array-frozen/temp
+**/__pycache__
