@@ -1,5 +1,5 @@
 torch==2.0.1
-torchaudio
-speechbrain
-transformers
-sox
+torchaudio==2.0.2
+speechbrain==0.5.16
+transformers==4.35.2
+pyyaml==6.0.1

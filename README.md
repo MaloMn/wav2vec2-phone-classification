@@ -17,6 +17,12 @@ Results of this work have been published at the Interspeech 2024 conference.
 For confidentiality reasons, datasets are not included.
 This work relies on the [C2SI](https://hal.science/hal-02921918), [CommonPhone](https://arxiv.org/abs/2201.05912) and [BREF](https://www.isca-archive.org/eurospeech_1991/larnel91_eurospeech.html) corpora. 
 
+## Recipes
+*Details of some of the Speechbrain recipes set up in this repository.* 
+- ``unfrozen-cp-3k-large-accents`` is the best recipe published in the Interspeech paper listed below.
+- ``unfrozen-cp-3k-large-accents-argmax`` takes the maximum of all 6 segments (1024-dim). LeakyReLu.
+- ``unfrozen-cp-3k-large-concatenate`` take both central segments (2048-dim) as input to the classifier.
+
 ## How to cite
 If you use this work, please cite as:
 
