@@ -94,4 +94,13 @@ def override_configuration(base_filename: str, override_filename: str, output_fi
 
 
 if __name__ == '__main__':
-    override_configuration("base.yml", "override.yml", "output.yml")
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('base_configuration', type=str)
+    parser.add_argument('override_configuration', type=str)
+    parser.add_argument('output', type=str)
+
+    args = parser.parse_args()
+
+    override_configuration(args.base_configuration, args.override_configuration, args.output)

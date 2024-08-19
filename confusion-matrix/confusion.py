@@ -221,7 +221,11 @@ if __name__ == '__main__':
     # launch('unfrozen-cp-14k-large-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
     # launch('unfrozen-cp-14k-light-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
 
-    launch('unfrozen-cp-lv-60-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')
-    launch('unfrozen-cp-xlsr-53-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')
+    # launch('unfrozen-cp-lv-60-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')
+    # launch('unfrozen-cp-xlsr-53-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')
+
+    launch('relu-snn-data-test', 'bref')
+    launch('relu-snn-data-train', 'bref')
+    launch('relu-snn-data-valid', 'bref')
 
     # launch('brefint-30', 'bref')

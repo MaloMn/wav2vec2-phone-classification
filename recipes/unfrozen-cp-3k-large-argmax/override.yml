@@ -1,0 +1,36 @@
+output_folder: !ref results/unfrozen-cp-3k-large-accents-argmax/<seed>
+
+output_transcription: !ref <output_folder>/output_{dataset}.json
+transcribe_dataloader_opts:
+   batch_size: !ref <test_batch_size>
+
+to_transcribe:
+   test: 
+      data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/bref/test.csv
+   hc_lec:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-lec-without-alp-test.csv
+   hc_dap:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-dap-without-alp-test.csv
+
+# Model
+wav2vec2_hub: LeBenchmark/wav2vec2-FR-3K-large
+
+# Data files
+data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
+cp_data_folder: /data/coros1/mmaisonneuve/CommonPhone/CP/fr/wav # CommonPhone audios
+dataset_folder: /data/coros1/mmaisonneuve/datasets/bref+cp/with_accents
+
+# Model parameters
+activation: !name:torch.nn.LeakyReLU
+freeze_wav2vec: False
+
+enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
+   input_shape: [null, 1024]
+
+wav2vec2: !new:speechbrain.lobes.models.huggingface_wav2vec.HuggingFaceWav2Vec2
+   output_norm: False
+
+error_rate_computer: !name:speechbrain.utils.metric_stats.ErrorRateStats
