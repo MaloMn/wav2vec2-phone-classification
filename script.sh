@@ -8,7 +8,8 @@
 #SBATCH --mem=15G
 #SBATCH --time=24:00:00
 #SBATCH --constraint='GPURAM_Min_24GB'
-#SBATCH --nodelist=eris
+##SBATCH --nodelist=apollon
+#SBATCH --exclude=apollon
 
 echo "Activating environment wav2vec" > $1.txt
 conda activate wav2vec

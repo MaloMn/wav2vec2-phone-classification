@@ -2,17 +2,17 @@
 
 import os
 import sys
-import torch
+import json
 import logging
+
+import torch
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+# from torch.nn import ZeroPad1d
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main, if_main_process
 from hyperpyyaml import load_hyperpyyaml
-import torch.nn.functional as F
-
-from torch.utils.data import DataLoader
-import torch.nn.functional as F
 from tqdm import tqdm
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -235,16 +235,20 @@ def dataio_prepare(hparams):
     @sb.utils.data_pipeline.takes("wav", "start")
     @sb.utils.data_pipeline.provides("sig")
     def audio_pipeline(wav, start):
-        # TODO Also care about what happens if the segment is located at the end of an audio!
         fr: int = int(hparams["sample_rate"] / 1_000)
-        start = max(0, int(start) * fr - (hparams["segment_length"] - 10) // 2)
-        stop = start + hparams["segment_length"]
+        start = int(start) * fr - (hparams["segment_length"] - 10) // 2
+        stop = start + hparams["segment_length"] + 1
 
         sig = sb.dataio.dataio.read_audio(({
             "file": wav,
-            "start": start,
+            "start": max(0, start),
             "stop": stop
         }))
+
+        # Add padding at the beginning if needed.
+        # This ensures that the phone 10ms segment is in the middle of the signal.
+        if start < 0:
+            return torch.cat((torch.zeros((start * (-1),)), sig), dim=0)
     
         return sig
 
