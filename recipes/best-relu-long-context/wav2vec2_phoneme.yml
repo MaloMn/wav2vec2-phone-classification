@@ -1,14 +1,11 @@
 # ################################
-# Model: wav2vec2 + DNN + CTC
-# Augmentation: SpecAugment
-# Authors: Sung-Lin Yeh 2021
+# The window is bigger here to have a middle segment
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 2002 
-#seed: 2001 # test
+seed: 2001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref results/unfrozen-cp-3k-large-accents-concatenate/<seed>
+output_folder: !ref results/best-relu-long-context/<seed>
 output_wer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -43,10 +40,10 @@ dataset_folder: /data/coros1/mmaisonneuve/datasets/bref+cp/with_accents
 train_csv: !ref <dataset_folder>/train.csv
 valid_csv: !ref <dataset_folder>/validation.csv
 test_csv: !ref <dataset_folder>/test.csv
-segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
+segment_length: 7910 # frames, math.floor((23 * 1000 / 49 + 25) * 16)
 
 # Training parameters
-number_of_epochs: 15 
+number_of_epochs: 4
 lr: 0.9
 lr_wav2vec: 0.0001
 sorting: ascending
@@ -56,8 +53,8 @@ sample_rate: 16000
 # With data_parallel batch_size is split into N jobs
 # With DDP batch_size is multiplied by N jobs
 # Must be 3 per GPU to fit 32GB of VRAM
-batch_size: 1024
-test_batch_size: 1024
+batch_size: 256
+test_batch_size: 256
 
 # Dataloader options
 train_dataloader_opts:
@@ -70,7 +67,7 @@ test_dataloader_opts:
    batch_size: !ref <test_batch_size>
 
 # Model parameters
-activation: !name:torch.nn.LeakyReLU
+activation: !name:torch.nn.ReLU
 dnn_layers: 3
 dnn_neurons: 1024
 freeze_wav2vec: False
@@ -90,7 +87,9 @@ epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
    limit: !ref <number_of_epochs>
 
 enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
-   input_shape: [null, 6144]
+   # input_shape: [null, 4608] # 768 * 6
+   input_shape: [null, 1024] # large 1024 * 6
+   # input_shape: [null, 3072] # light 512 * 6
    activation: !ref <activation>
    dnn_blocks: !ref <dnn_layers>
    dnn_neurons: !ref <dnn_neurons>

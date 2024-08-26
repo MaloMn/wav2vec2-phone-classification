@@ -1,14 +1,11 @@
 # ################################
-# Model: wav2vec2 + DNN + CTC
-# Augmentation: SpecAugment
-# Authors: Sung-Lin Yeh 2021
+# Test with relu and keeping only both middle segments amongst the six segments.
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 2002 
-#seed: 2001 # test
+seed: 2001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref results/unfrozen-cp-3k-large-accents-concatenate/<seed>
+output_folder: !ref results/best-relu-test/<seed>
 output_wer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -70,7 +67,7 @@ test_dataloader_opts:
    batch_size: !ref <test_batch_size>
 
 # Model parameters
-activation: !name:torch.nn.LeakyReLU
+activation: !name:torch.nn.ReLU
 dnn_layers: 3
 dnn_neurons: 1024
 freeze_wav2vec: False
@@ -90,7 +87,9 @@ epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
    limit: !ref <number_of_epochs>
 
 enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
-   input_shape: [null, 6144]
+   # input_shape: [null, 4608] # 768 * 6
+   input_shape: [null, 2048] # large 1024 * 6
+   # input_shape: [null, 3072] # light 512 * 6
    activation: !ref <activation>
    dnn_blocks: !ref <dnn_layers>
    dnn_neurons: !ref <dnn_neurons>

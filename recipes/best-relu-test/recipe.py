@@ -13,7 +13,6 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from tqdm import tqdm
 import json
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -33,25 +32,9 @@ class ASR(sb.Brain):
             latents = self.modules.extractor(wavs)
             feats = self.modules.encoder_wrapper(latents, wav_lens=wav_lens)[
                 "embeddings"
-            ]
+            ][:, 2:4, :]
         else:  # HuggingFace pretrained model
-            feats = self.modules.wav2vec2(wavs, wav_lens)
-
-        # start = time.time()
-        # print("slicing", start)
-        # output = feats[:, 2:4, :]
-        # print(time.time() - start)
-
-        # print(output.storage().data_ptr(), feats.storage().data_ptr())
-        # print(output.get_device(), feats.get_device())
-        # print(output.is_cuda, feats.is_cuda)
-
-        # raise Exception("We'll stop there.")
-
-        # print(feats.shape)
-        # print(feats[2:3,:].shape)
-        # print(feats.view(feats.size(0), -1).shape)
-        # print("stop")
+            feats = self.modules.wav2vec2(wavs, wav_lens)[:, 2:4, :]
 
         x = self.modules.enc(feats.view(feats.size(0), -1))
 
