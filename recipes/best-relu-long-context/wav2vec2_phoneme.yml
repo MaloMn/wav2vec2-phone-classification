@@ -25,6 +25,12 @@ to_transcribe:
    hc_dap:
       data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
       transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-dap-without-alp-test.csv
+   patients_lec:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/patients-lec-test.csv
+   patients_dap:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/patients-dap-test.csv
 
 # Using the 14k wav2vec model fine-tuned on French language ONLY
 # wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
