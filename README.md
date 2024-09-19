@@ -28,9 +28,12 @@ If you use this work, please cite as:
 
 ```bib
 @inproceedings{maisonneuve24,
+  title     = {Towards objective and interpretable speech disorder assessment: a comparative analysis of CNN and transformer-based models},
   author    = {Malo Maisonneuve and Corinne Fredouille and Muriel Lalain and Alain Ghio and Virginie Woisard},
-  title     = {{Towards objective and interpretable speech disorder assessment: a comparative analysis of CNN and transformer-based models}},
-  year      = 2024,
-  booktitle = {Proc. Interspeech 2024}
+  year      = {2024},
+  booktitle = {Interspeech 2024},
+  pages     = {1970--1974},
+  doi       = {10.21437/Interspeech.2024-267},
+  issn      = {2958-1796},
 }
 ```
