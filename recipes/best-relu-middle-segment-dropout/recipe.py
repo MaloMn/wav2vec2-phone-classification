@@ -2,17 +2,17 @@
 
 import os
 import sys
-import json
-import logging
-
 import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
-# from torch.nn import ZeroPad1d
+import logging
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main, if_main_process
 from hyperpyyaml import load_hyperpyyaml
+import torch.nn.functional as F
+
+from torch.utils.data import DataLoader
+import torch.nn.functional as F
 from tqdm import tqdm
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +32,14 @@ class ASR(sb.Brain):
             latents = self.modules.extractor(wavs)
             feats = self.modules.encoder_wrapper(latents, wav_lens=wav_lens)[
                 "embeddings"
-            ][:, 12, :]
+            ][:, 3, :]
         else:  # HuggingFace pretrained model
-            feats = self.modules.wav2vec2(wavs, wav_lens)[:, 12, :]
+            feats = self.modules.wav2vec2(wavs, wav_lens)[:, 3, :]
 
-        x = self.modules.enc(feats)
+        x = self.modules.classifier(feats)
 
         # Compute outputs
-        logits = self.modules.ctc_lin(x)
+        logits = self.modules.final_layer(x)
 
         return logits, wav_lens
 
@@ -373,11 +373,11 @@ if __name__ == "__main__":
 
     asr_brain.hparams.test_wer_file = os.path.join(hparams["output_wer_folder"], "wer_test.txt")
 
-    #asr_brain.evaluate(
-    #    test_dataset,
-    #    test_loader_kwargs=hparams["test_dataloader_opts"],
-    #    min_key="WER",
-    #)
+    asr_brain.evaluate(
+        test_dataset,
+        test_loader_kwargs=hparams["test_dataloader_opts"],
+        min_key="WER",
+    )
 
     for k, v in hparams["to_transcribe"].items():
         transcription_dataset = dataio_prepare_transcript(hparams, v)
