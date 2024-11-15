@@ -18,17 +18,6 @@ from tqdm import tqdm
 logger = logging.getLogger(__name__)
 
 
-class Classifier(sb.nnet.containers.Sequential):
-    """Block for linear layers."""
-    def __init__(self, input_shape, layers, neurons, activation, dropout):
-        super().__init__(input_shape=input_shape)
-
-        for i in range(1, layers + 1):
-            self.append(sb.nnet.linear.Linear, n_neurons=neurons, layer_name=f"fc{i}")
-            self.append(activation(), layer_name=f"act{i}")
-            self.append(dropout(), layer_name=f"dropout{i}")
-
-
 # Define training procedure
 class ASR(sb.Brain):
     def compute_forward(self, batch, stage):
@@ -48,7 +37,7 @@ class ASR(sb.Brain):
         else:  # HuggingFace pretrained model
             feats = self.modules.wav2vec2(wavs, wav_lens)[:, 12, :]
 
-        x = self.modules.enc(feats)
+        x = self.modules.classifier(feats)
 
         # Compute outputs
         logits = self.modules.final_layer(x)

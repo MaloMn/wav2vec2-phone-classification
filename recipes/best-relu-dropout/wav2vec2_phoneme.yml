@@ -1,11 +1,11 @@
 # ################################
-# The window is bigger here to have a middle segment
+# What we published at Interspeech24 + dropout
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
 seed: 2001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref results/best-relu-long-context-dropout/<seed>
+output_folder: !ref results/best-relu-dropout/<seed>
 output_wer_folder: !ref <output_folder>/
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -46,10 +46,10 @@ dataset_folder: /data/coros1/mmaisonneuve/datasets/bref+cp/with_accents
 train_csv: !ref <dataset_folder>/train.csv
 valid_csv: !ref <dataset_folder>/validation.csv
 test_csv: !ref <dataset_folder>/test.csv
-segment_length: 7910 # frames, math.floor((23 * 1000 / 49 + 25) * 16)
+segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
 
 # Training parameters
-number_of_epochs: 1
+number_of_epochs: 15 
 lr: 0.9
 lr_wav2vec: 0.0001
 sorting: ascending
@@ -59,8 +59,8 @@ sample_rate: 16000
 # With data_parallel batch_size is split into N jobs
 # With DDP batch_size is multiplied by N jobs
 # Must be 3 per GPU to fit 32GB of VRAM
-batch_size: 256
-test_batch_size: 256
+batch_size: 1024
+test_batch_size: 1024
 
 # Dataloader options
 train_dataloader_opts:
@@ -97,7 +97,7 @@ wav2vec2: !new:speechbrain.lobes.models.huggingface_wav2vec.HuggingFaceWav2Vec2
 
 
 classifier: !new:classifier.Classifier
-   input_shape: [null, 1024]
+   input_shape: [null, 6144]
    neurons: !ref <dnn_neurons>
    layers: !ref <dnn_layers>
    activation: !ref <activation>
