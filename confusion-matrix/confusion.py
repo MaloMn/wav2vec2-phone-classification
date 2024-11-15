@@ -181,6 +181,9 @@ def launch(folder, *args):
         Confusion(f"c2si/{folder}/output_hc_lec.json")
     if 'hc' in args:
         Confusion(f"c2si/{folder}/output_healthy_controls.json")
+    if 'patients' in args:
+        Confusion(f"c2si/{folder}/output_patients_dap.json")
+        Confusion(f"c2si/{folder}/output_patients_lec.json")
 
     if 'oral-nasal' in args:
         Confusion(f"c2si/{folder}/output_hc_lec.json", ["a", "Ê", "Û", "Ô", "u", "y", "i", "ã", "ɔ̃", "µ", "n", "m"], "_oral_nasal")
@@ -215,8 +218,8 @@ if __name__ == '__main__':
     # for i in range(1, 11):
     #     launch(f'layers/{i}', 'bref', 'dap', 'lec')
 
+    # launch('unfrozen-cp-3k-large-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', "patients")  # WEIGHTS - FROM UNFROZEN
     # launch('unfrozen-cp-3k-large-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
-    #launch('unfrozen-cp-3k-large-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
     # launch('unfrozen-cp-3k-base-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
     # launch('unfrozen-cp-14k-large-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
     # launch('unfrozen-cp-14k-light-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')  # WEIGHTS - FROM UNFROZEN
@@ -224,8 +227,15 @@ if __name__ == '__main__':
     # launch('unfrozen-cp-lv-60-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')
     # launch('unfrozen-cp-xlsr-53-accents', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent')
 
-    launch('relu-snn-data-test', 'bref')
-    launch('relu-snn-data-train', 'bref')
-    launch('relu-snn-data-valid', 'bref')
+    # launch('relu-snn-data-test', 'bref')
+    # launch('relu-snn-data-train', 'bref')
+    # launch('relu-snn-data-valid', 'bref')
 
     # launch('brefint-30', 'bref')
+
+    # launch('best-relu-test', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', "patients")
+    # launch('best-relu-long-context', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', 'patients')
+    # launch('best-relu-middle-segment', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', 'patients')
+
+    launch('best-relu-middle-segment-dropout', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', 'patients')
+    launch('best-relu-longer-context-dropout', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', 'patients')

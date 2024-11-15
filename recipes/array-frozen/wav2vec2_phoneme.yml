@@ -31,7 +31,7 @@ wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
 wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
 
 # Weighted model
-weighted_ssl_model: !new:speechbrain.lobes.models.huggingface_wav2vec.ChopSSLLayers
+weighted_ssl_model: !new:chop.ChopSSLLayers
    encoder: !ref <wav2vec2>
    layer_id: ${{LAYER_ID}}
 

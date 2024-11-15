@@ -16,19 +16,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
-
-class ChopSSLLayers(torch.nn.Module):
-    def __init__(self, encoder, layer_id):
-        super().__init__()
-        self.encoder = encoder
-        self.layer_id = layer_id
-
-    def forward(self, wav, wav_lens=None):
-        hidden_states = self.encoder(wav)
-
-        # Keeping only the specified layers
-        return hidden_states[self.layer_id, :, :, :]
-
+# requires_grad = False => on
 
 # Define training procedure
 class ASR(sb.Brain):

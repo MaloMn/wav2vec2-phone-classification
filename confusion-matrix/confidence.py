@@ -48,7 +48,7 @@ class Confidence:
 
 def print_confidence(confidence):
     value, (mini, maxi) = confidence
-    print(f"\t→ {round(value*100, 2)} lies in [{round(mini*100, 2)}; {round(maxi*100, 2)}]")
+    print(f"\t→ {round(value*100, 2)} ± {round(((maxi - mini) / 2)*100, 2)}")
 
 
 def iterate(*folders):
@@ -75,7 +75,12 @@ def iterate(*folders):
 
 
 if __name__ == '__main__':
-    iterate("unfrozen-cp-14k-large-accents", "unfrozen-cp-14k-light-accents", "unfrozen-cp-3k-large-accents",
-            "unfrozen-cp-3k-base-accents")
+    # iterate("unfrozen-cp-14k-large-accents", "unfrozen-cp-14k-light-accents", "unfrozen-cp-3k-large-accents",
+    #         "unfrozen-cp-3k-base-accents")
+
+    # iterate("best-relu-longer-context")
 
     #  "frozen", "unfrozen", "unfrozen-14k-light", "unfrozen-3k-large", "unfrozen-3k-base",
+
+    print_confidence(Confidence(f"c2si/best-relu-long-context/output_patients_lec.json").balanced)
+    print_confidence(Confidence(f"c2si/best-relu-long-context/output_patients_dap.json").balanced)
