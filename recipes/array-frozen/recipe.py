@@ -6,6 +6,7 @@ import torch
 import logging
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main, if_main_process
+from speechbrain.core import AMPConfig
 from hyperpyyaml import load_hyperpyyaml
 import torch.nn.functional as F
 
@@ -16,7 +17,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
-# requires_grad = False => on
+# requires_grad = False => on hidden w2v2 layers that don't need to be finetuned.
 
 # Define training procedure
 class ASR(sb.Brain):
@@ -26,11 +27,17 @@ class ASR(sb.Brain):
         wavs, wav_lens = batch.sig
         wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
 
-        feats = self.modules.weighted_ssl_model(wavs)
-        x = self.modules.enc(feats.view(feats.size(0), -1))
+        # feats = self.modules.keep_one_layer(wavs, wav_lens)[:, 3, :]
+        feats = self.modules.wav2vec2(wavs, wav_lens)[:, 3, :]
+        print(feats.shape)
+
+        # feats = self.modules.weighted_ssl_model(wavs)
+        x = self.modules.classifier(feats)
+        print(x.shape)
 
         # Compute outputs
-        logits = self.modules.ctc_lin(x)
+        logits = self.modules.linear_layer(x)
+        print(logits.shape)
 
         return logits, wav_lens
 
@@ -55,51 +62,28 @@ class ASR(sb.Brain):
         return loss
 
     def fit_batch(self, batch):
-        should_step = self.step % self.grad_accumulation_factor == 0
+        amp = AMPConfig.from_name(self.precision)
+        should_step = (self.step % self.grad_accumulation_factor) == 0
 
-        # Managing automatic mixed precision
-        if self.auto_mix_prec:
-            # self.wav2vec_optimizer.zero_grad()
-            self.model_optimizer.zero_grad()
-
-            with torch.cuda.amp.autocast():
-                with self.no_sync():
+        with self.no_sync(not should_step):
+            if self.use_amp:
+                with torch.autocast(dtype=amp.dtype, device_type=torch.device(self.device).type):
                     outputs = self.compute_forward(batch, sb.Stage.TRAIN)
-                loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
-            with self.no_sync(not should_step):
-                self.scaler.scale(
-                    loss / self.grad_accumulation_factor
-                ).backward()
-
-            if should_step:
-                # if not self.hparams.freeze_wav2vec:
-                #     self.scaler.unscale_(self.wav2vec_optimizer)
-
-                self.scaler.unscale_(self.model_optimizer)
-
-                if self.check_gradients(loss):
-                    # self.scaler.step(self.wav2vec_optimizer)
-                    self.scaler.step(self.model_optimizer)
-
-                self.scaler.update()
-                self.optimizer_step += 1
-        else:
-            with self.no_sync():
+                    loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
+            else:
                 outputs = self.compute_forward(batch, sb.Stage.TRAIN)
+                loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
 
-            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
-            (loss / self.grad_accumulation_factor).backward()
+            scaled_loss = self.scaler.scale(
+                loss / self.grad_accumulation_factor
+            )
+            self.check_loss_isfinite(scaled_loss)
+            scaled_loss.backward()
 
-            if should_step:
-                if self.check_gradients(loss):
-                    # self.wav2vec_optimizer.step()
-                    self.model_optimizer.step()
+        if should_step:
+            self.optimizers_step()
 
-                # self.wav2vec_optimizer.zero_grad()
-                self.model_optimizer.zero_grad()
-                
-                self.optimizer_step += 1
-
+        self.on_fit_batch_end(batch, outputs, loss, should_step)
         return loss.detach().cpu()
 
     def on_stage_start(self, stage, epoch):
@@ -107,6 +91,10 @@ class ASR(sb.Brain):
         if stage != sb.Stage.TRAIN:
             # self.cer_metric = self.hparams.cer_computer()
             self.wer_metric = self.hparams.error_rate_computer()
+
+            # for module in [self.module.classifier, self.module.linear_layer]:
+            #     for p in module.parameters():
+            #         p.requires_grad = True
 
     def on_stage_end(self, stage, stage_loss, epoch):
         """Gets called at the end of an epoch."""
@@ -163,6 +151,8 @@ class ASR(sb.Brain):
             self.hparams.model.parameters()
         )
 
+        # raise Exception(f"{self.hparams.model.parameters()}")
+
         if self.checkpointer is not None:
             # self.checkpointer.add_recoverable("wav2vec_opt", self.wav2vec_optimizer)
             self.checkpointer.add_recoverable("modelopt", self.model_optimizer)
@@ -198,29 +188,24 @@ class ASR(sb.Brain):
         return transcripts, truth
     
 
-def dataio_prepare(hparams):
-    """This function prepares the datasets to be used in the brain class.
-    It also defines the data processing pipeline through user-defined functions."""
-    data_folder = hparams["data_folder"]
-
-    train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["train_csv"], replacements={"data_folder": data_folder},
+def load_dataset(name: str, replacement=None):
+    output = sb.dataio.dataset.DynamicItemDataset.from_csv(
+        csv_path=hparams[name], replacements=replacement,
     )
 
     # we sort training data to speed up training and get better results.
-    train_data = train_data.filtered_sorted(sort_key="wav")
+    return output.filtered_sorted(sort_key="wav")
+
+
+def dataio_prepare(hparams):
+    """This function prepares the datasets to be used in the brain class.
+    It also defines the data processing pipeline through user-defined functions."""
     hparams["train_dataloader_opts"]["shuffle"] = False
+    data_folder, data_folder_cp = hparams["data_folder"], hparams["cp_data_folder"]
 
-    valid_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["valid_csv"], replacements={"data_folder": data_folder},
-    )
-    valid_data = valid_data.filtered_sorted(sort_key="wav")
-
-    # test is separate
-    test_dataset = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["test_csv"], replacements={"data_folder": data_folder},
-    )
-    test_dataset = test_dataset.filtered_sorted(sort_key="wav")
+    train_data = load_dataset("train_csv", {"data_folder": data_folder, "cp_data_folder": data_folder_cp})
+    valid_data = load_dataset("valid_csv", {"data_folder": data_folder, "cp_data_folder": data_folder_cp})
+    test_dataset = load_dataset("test_csv", {"data_folder": data_folder, "cp_data_folder": data_folder_cp})
 
     datasets = [train_data, valid_data, test_dataset]
 

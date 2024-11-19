@@ -1,7 +1,7 @@
 # ################################
 # Model: wav2vec2 + DNN
 # ################################
-
+# debug: True
 # Seed needs to be set at top of yaml, before objects with parameters are made
 seed: 2001 
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
@@ -24,25 +24,27 @@ to_transcribe:
    hc_dap:
       data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
       transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-dap-without-alp-test.csv
-
+   patients_lec:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/patients-lec-test.csv
+   patients_dap:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/patients-dap-test.csv
 
 # Using the 14k wav2vec model fine-tuned on French language ONLY
-wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
+wav2vec2_hub: LeBenchmark/wav2vec2-FR-3K-large
 wav2vec2_folder: !ref <save_folder>/wav2vec2_checkpoint
-
-# Weighted model
-weighted_ssl_model: !new:chop.ChopSSLLayers
-   encoder: !ref <wav2vec2>
-   layer_id: ${{LAYER_ID}}
 
 # Data files
 data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
+cp_data_folder: /data/coros1/mmaisonneuve/CommonPhone/CP/fr/wav # CommonPhone audios
+
 ckpt_interval_minutes: 25 # save checkpoint every N min
-dataset_folder: /data/coros1/mmaisonneuve/datasets/bref
+dataset_folder: /data/coros1/mmaisonneuve/datasets/bref+cp/with_accents
 train_csv: !ref <dataset_folder>/train.csv
 valid_csv: !ref <dataset_folder>/validation.csv
 test_csv: !ref <dataset_folder>/test.csv
-segment_length: 2032 # frames, math.floor((5 * 1000 / 49 + 25) * 16)
+segment_length: 2359 # frames, math.floor((6 * 1000 / 49 + 25) * 16)
 
 # Training parameters
 number_of_epochs: 15
@@ -70,18 +72,12 @@ test_dataloader_opts:
    batch_size: !ref <test_batch_size>
 
 # Model parameters
-activation: !name:torch.nn.LeakyReLU
+activation: !name:torch.nn.ReLU
 dnn_layers: 3
 dnn_neurons: 1024
-freeze_wav2vec: True
 
 # Outputs
 output_neurons: 32  # 31 phones and silence in BREF
-
-# Decoding parameters
-# blank_index: -1
-use_language_modelling: False
-# ngram_lm_path: !PLACEHOLDER
 
 #
 # Functions and classes
@@ -89,38 +85,45 @@ use_language_modelling: False
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
    limit: !ref <number_of_epochs>
 
-enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
-   input_shape: [null, 6144]
+dropout: !new:torch.nn.Dropout
+   p: 0.4
+
+wav2vec2: !new:speechbrain.lobes.models.huggingface_transformers.wav2vec2.Wav2Vec2
+   source: !ref <wav2vec2_hub>
+   freeze: True
+   freeze_feature_extractor: True
+   save_path: !ref <wav2vec2_folder>
+   # output_all_hiddens: False
+
+# keep_one_layer: !new:custom.KeepOneLayer
+#    encoder: !ref <wav2vec2>
+#    layer_id: ${{LAYER_ID}}
+
+# classifier: !new:custom.Classifier
+#    input_shape: [null, 1024]
+#    neurons: !ref <dnn_neurons>
+#    layers: !ref <dnn_layers>
+#    activation: !ref <activation>
+#    dropout: !ref <dropout>
+
+classifier: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
+   input_shape: [null, 1024]
    activation: !ref <activation>
    dnn_blocks: !ref <dnn_layers>
    dnn_neurons: !ref <dnn_neurons>
 
-wav2vec2: !new:speechbrain.lobes.models.huggingface_wav2vec.HuggingFaceWav2Vec2
-   source: !ref <wav2vec2_hub>
-   output_norm: True
-   freeze: !ref <freeze_wav2vec>
-   save_path: !ref <wav2vec2_folder>
-   apply_spec_augment: False
-   output_all_hiddens: True
-
-ctc_lin: !new:speechbrain.nnet.linear.Linear
+linear_layer: !new:speechbrain.nnet.linear.Linear
    input_size: !ref <dnn_neurons>
    n_neurons: !ref <output_neurons>
 
-log_softmax: !new:speechbrain.nnet.activations.Softmax
-   apply_log: True
-
-ctc_cost: !name:speechbrain.nnet.losses.ctc_loss
-   blank_index: 0
-
 modules:
    wav2vec2: !ref <wav2vec2>
-   enc: !ref <enc>
-   ctc_lin: !ref <ctc_lin>
-   weighted_ssl_model: !ref <weighted_ssl_model>
+   classifier: !ref <classifier>
+   linear_layer: !ref <linear_layer>
+   # keep_one_layer: !ref <keep_one_layer>
 
 model: !new:torch.nn.ModuleList
-   - [!ref <enc>, !ref <ctc_lin>]
+   - [!ref <classifier>, !ref <linear_layer>]
 
 model_opt_class: !name:torch.optim.Adadelta
    lr: !ref <lr>
