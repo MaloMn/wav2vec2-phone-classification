@@ -12,7 +12,7 @@ class KeepOneLayer(torch.nn.Module):
         hidden_states = self.encoder(wav)
         # raise Exception(f"Shape is {hidden_states.shape}")
         # Keeping only the specified layers
-        return hidden_states[self.layer_id, :, :, :]
+        return self.layer_id, hidden_states[self.layer_id, :, :, :]
     
 
 class Classifier(sb.nnet.containers.Sequential):
