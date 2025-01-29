@@ -237,5 +237,8 @@ if __name__ == '__main__':
     # launch('best-relu-long-context', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', 'patients')
     # launch('best-relu-middle-segment', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', 'patients')
 
-    launch('best-relu-middle-segment-dropout', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', 'patients')
-    launch('best-relu-longer-context-dropout', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', 'patients')
+    launch('best-relu-middle-segment-dropout-5-shuffle-context', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', 'patients')
+    launch('best-relu-middle-segment-dropout-3-shuffle-context', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', 'patients')
+    launch('best-relu-middle-segment-dropout-1-shuffle-context', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', 'patients')
+
+    # launch('best-relu-longer-context-dropout', 'bref', 'dap', 'lec', 'oral-nasal', 'obstruent', 'patients')

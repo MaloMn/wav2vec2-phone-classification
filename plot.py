@@ -6,6 +6,7 @@ from pathlib import Path
 
 from sklearn.metrics import balanced_accuracy_score
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import numpy as np
 import polars as pl
 
@@ -151,21 +152,32 @@ class AccuracyPerPatient(Plot):
 
 class HiddenLayerClassification(Plot):
 
-    def __init__(self):
-        self.accuracies = {}
-        for path in glob("confusion-matrix/bref/array-*/output_test_accuracies.json"):
-            with open(path) as f:
-                hidden_layer = re.findall(r"\d+", path)[0]
-                self.accuracies[hidden_layer] = json.load(f)["balanced_accuracy"]
-
-        self.accuracies = self.get_data("confusion-matrix/bref/array-*/output_test_accuracies.json")
-        self.c2si_dap = self.get_data("confusion-matrix/c2si/array-*/output_hc_dap_accuracies.json")
-        self.c2si_lec = self.get_data("confusion-matrix/c2si/array-*/output_hc_lec_accuracies.json")
+    def     __init__(self):
 
         self.data = {
-            "BREF-Int": self.accuracies,
-            "DAP (Healthy Controls)": self.c2si_dap,
-            "LEC (Healthy Controls)": self.c2si_lec
+            "frozen": {
+                "BREF-Int": self.get_data("confusion-matrix/bref/array-*/output_test_accuracies.json"),
+                "DAP (Healthy Controls)": self.get_data("confusion-matrix/c2si/array-*/output_hc_dap_accuracies.json"),
+                "LEC (Healthy Controls)": self.get_data("confusion-matrix/c2si/array-*/output_hc_lec_accuracies.json")
+            },
+            "fine-tuned": {
+                "BREF-Int": self.get_data("confusion-matrix/bref/ft-array-*/output_test_accuracies.json"),
+                "DAP (Healthy Controls)": self.get_data("confusion-matrix/c2si/ft-array-*/output_hc_dap_accuracies.json"),
+                "LEC (Healthy Controls)": self.get_data("confusion-matrix/c2si/ft-array-*/output_hc_lec_accuracies.json")
+            }
+        }
+
+        self.style = {
+            "frozen": {
+                "BREF-Int": ["tab:blue", "--"],
+                "DAP (Healthy Controls)": ["tab:orange", "--"],
+                "LEC (Healthy Controls)": ["tab:green", "--"]
+            },
+            "fine-tuned": {
+                "BREF-Int": ["tab:blue", "-"],
+                "DAP (Healthy Controls)": ["tab:orange", "-"],
+                "LEC (Healthy Controls)": ["tab:green", "-"]
+            }
         }
 
     def get_data(self, general_path: str):
@@ -174,7 +186,7 @@ class HiddenLayerClassification(Plot):
             with open(path) as f:
                 hidden_layer = int(re.findall(r"array-(\d+)", path)[0])
                 output[hidden_layer] = json.load(f)["balanced_accuracy"]
-                # print(path, hidden_layer, output[hidden_layer])
+                # print(path, output, output[hidden_layer])
 
         return output
 
@@ -183,17 +195,30 @@ class HiddenLayerClassification(Plot):
 
         x = [str(i) for i in range(25)]
 
-        for key, data in self.data.items():
-            values = [data[i] if i in data else 0.0 for i in range(25)]
-            print(values)
-            plots.plot(x, values, label=key)
+        print(self.data)
+        for model_type, data in self.data.items():
+            for key, d in data.items():
+                values = [d[i] if i in d else 0.0 for i in range(25)]
+                print(values)
+                color, line_style = self.style[model_type][key]
+                plots.plot(x, values, line_style, color=color, label=key if model_type=="fine-tuned" else "")
 
         plots.legend(loc="upper right", reverse=True)
+
+        old_handles, labels = plots.get_legend_handles_labels()
+
+        legend_elements = [Line2D([0], [0], ls="--", color='tab:blue', lw=2, label='W2V2 Frozen'),
+                           Line2D([0], [0], ls='-', color='tab:blue', label='W2V2 fine-tuned')]
+
+        plt.legend(handles=old_handles + legend_elements)
+
         plots.set_title('Balanced accuracies from hidden W2V2 layers')
         plots.set_xlabel('Hidden layer identifier')
         plots.set_ylabel('Balanced accuracy (in %)')
         plots.set_ylim([0, 100])
         plots.set_xlim([0, len(x) - 1])
+
+        plots.set_yticks([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100])
 
         plots.set_axisbelow(True)
         plots.grid(True, color='#cccccc', linestyle='--')
@@ -202,6 +227,76 @@ class HiddenLayerClassification(Plot):
         self.export("plots/array/accuracies")
 
 
+class ContextLinePlot(Plot):
+
+    def __init__(self):
+        dimensions_zeros = ["", "-5-context", "-3-context", "-1-context"]
+        dimensions_shuffle = ["", "-5-shuffle-context", "-3-shuffle-context", "-1-shuffle-context"]
+
+        datasets = {
+            "BREF-Int": "bref/best-relu-middle-segment-dropout{dim}/output_test",
+            "LEC (HC)": "c2si/best-relu-middle-segment-dropout{dim}/output_hc_lec",
+            "DAP (HC)": "c2si/best-relu-middle-segment-dropout{dim}/output_hc_dap",
+            "LEC (Patients)": "c2si/best-relu-middle-segment-dropout{dim}/output_patients_lec",
+            "DAP (Patients)": "c2si/best-relu-middle-segment-dropout{dim}/output_patients_dap"
+        }
+
+        self.error_margins = {
+            "BREF-Int": 0.2,
+            "LEC (HC)": 0.6,
+            "DAP (HC)": 0.4,
+            "LEC (Patients)": 0.2,
+            "DAP (Patients)": 0.2
+        }
+
+        self.data_to_plot = {
+            "When setting rest of context to 0": {
+                k: [ContextLinePlot.read_data("confusion-matrix/" + path.format(dim=d) + "_accuracies.json") for d in
+                    dimensions_zeros] for k, path in datasets.items()
+            },
+            "When shuffling contexts per batch": {
+                k: [ContextLinePlot.read_data("confusion-matrix/" + path.format(dim=d) + "_accuracies.json") for d in
+                    dimensions_shuffle] for k, path in datasets.items()
+            }
+        }
+
+    @staticmethod
+    def read_data(path):
+        with open(path) as f:
+            data = json.load(f)
+
+        return data["balanced_accuracy"]
+
+    def compute_graphs(self):
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        fig.suptitle('Influence of audio context around phone occurrence')
+
+        for ax, (title, plotting_data) in zip((ax1, ax2), self.data_to_plot.items()):
+            for key, d in plotting_data.items():
+                ax.plot([0, 1, 2, 3], d, 'o-', label=key)
+                ax.fill_between([0, 1, 2, 3], [a - self.error_margins[key] for a in d], [a + self.error_margins[key] for a in d], alpha=0.2)
+
+            ax.set_title(title)
+            if ax == ax2:
+                ax.legend()
+
+            ax.set_xticks([0, 1, 2, 3])
+            ax.set_xticklabels(['Full context', '5/7 context', '3/7 context', '1/7 context'], fontsize=8)
+            ax.set_xlabel("Portion of useful context")
+
+            ax.set_yticks([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100])
+            ax.set_ylabel("Balanced accuracy (in %)")
+
+            ax.set_ylim([0, 100])
+            ax.set_xlim([0, 3])
+
+            ax.set_axisbelow(True)
+            ax.grid(True, color='#cccccc', linestyle='--')
+
+        self.export("plots/context-experiments")
+
+
 if __name__ == '__main__':
     # AccuracyPerPatient().compute_graphs()
     HiddenLayerClassification().compute_graphs()
+    # ContextLinePlot().compute_graphs()

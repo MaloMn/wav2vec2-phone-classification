@@ -2,12 +2,14 @@
 
 import os
 import sys
+from pathlib import Path
+
 import torch
 import logging
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main, if_main_process
+from speechbrain.core import AMPConfig
 from hyperpyyaml import load_hyperpyyaml
-import torch.nn.functional as F
 
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
@@ -16,7 +18,29 @@ import json
 
 logger = logging.getLogger(__name__)
 
-# requires_grad = False => on
+
+# TODO Uncomment below to save fully-connected layers
+fully_connected = {
+    "FC1": [],
+    "FC2": [],
+    "FC3": []
+}
+
+final_layer = []
+
+# TODO Code specific to saving fully-connected layers
+def meta_hook(layer_name: str):
+
+    global fully_connected
+    def custom_hook(module, input, output):
+
+        global fully_connected
+        nonlocal layer_name
+
+        fully_connected[layer_name] += [output.detach().cpu()]
+        # print("custom_hook:", fully_connected[layer_name].shape, fully_connected[layer_name].is_cuda)
+
+    return custom_hook
 
 # Define training procedure
 class ASR(sb.Brain):
@@ -27,7 +51,16 @@ class ASR(sb.Brain):
         wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
 
         feats = self.modules.weighted_ssl_model(wavs)
+
+        hook_1 = self.modules.classifier.act1.register_forward_hook(meta_hook("FC1"))
+        hook_2 = self.modules.classifier.act2.register_forward_hook(meta_hook("FC2"))
+        hook_3 = self.modules.classifier.act3.register_forward_hook(meta_hook("FC3"))
+
         x = self.modules.enc(feats.view(feats.size(0), -1))
+
+        hook_1.remove()
+        hook_2.remove()
+        hook_3.remove()
 
         # Compute outputs
         logits = self.modules.ctc_lin(x)
@@ -55,51 +88,32 @@ class ASR(sb.Brain):
         return loss
 
     def fit_batch(self, batch):
+        amp = AMPConfig.from_name(self.precision)
         should_step = self.step % self.grad_accumulation_factor == 0
 
-        # Managing automatic mixed precision
-        if self.auto_mix_prec:
-            # self.wav2vec_optimizer.zero_grad()
-            self.model_optimizer.zero_grad()
-
-            with torch.cuda.amp.autocast():
-                with self.no_sync():
+        with self.no_sync(not should_step):
+            if self.use_amp:
+                with torch.autocast(
+                    dtype=amp.dtype, device_type=torch.device(self.device).type,
+                ):
                     outputs = self.compute_forward(batch, sb.Stage.TRAIN)
-                loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
-            with self.no_sync(not should_step):
-                self.scaler.scale(
-                    loss / self.grad_accumulation_factor
-                ).backward()
-
-            if should_step:
-                # if not self.hparams.freeze_wav2vec:
-                #     self.scaler.unscale_(self.wav2vec_optimizer)
-
-                self.scaler.unscale_(self.model_optimizer)
-
-                if self.check_gradients(loss):
-                    # self.scaler.step(self.wav2vec_optimizer)
-                    self.scaler.step(self.model_optimizer)
-
-                self.scaler.update()
-                self.optimizer_step += 1
-        else:
-            with self.no_sync():
+                    loss = self.compute_objectives(
+                        outputs, batch, sb.Stage.TRAIN
+                    )
+            else:
                 outputs = self.compute_forward(batch, sb.Stage.TRAIN)
+                loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
 
-            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
-            (loss / self.grad_accumulation_factor).backward()
+            scaled_loss = self.scaler.scale(
+                loss / self.grad_accumulation_factor
+            )
+            self.check_loss_isfinite(scaled_loss)
+            scaled_loss.backward()
 
-            if should_step:
-                if self.check_gradients(loss):
-                    # self.wav2vec_optimizer.step()
-                    self.model_optimizer.step()
+        if should_step:
+            self.optimizers_step()
 
-                # self.wav2vec_optimizer.zero_grad()
-                self.model_optimizer.zero_grad()
-                
-                self.optimizer_step += 1
-
+        self.on_fit_batch_end(batch, outputs, loss, should_step)
         return loss.detach().cpu()
 
     def on_stage_start(self, stage, epoch):
@@ -171,7 +185,7 @@ class ASR(sb.Brain):
         # self.wav2vec_optimizer.zero_grad(set_to_none)
         self.model_optimizer.zero_grad(set_to_none)
 
-    def transcribe_dataset(self, dataset, min_key, loader_kwargs):
+    def transcribe_dataset(self, dataset, min_key, loader_kwargs, model_name, dataset_name):
         # If dataset isn't a Dataloader, we create it. 
         if not isinstance(dataset, DataLoader):
             loader_kwargs["ckpt_prefix"] = None
@@ -182,18 +196,36 @@ class ASR(sb.Brain):
         self.on_evaluate_start(min_key=min_key) # We call the on_evaluate_start that will load the best model
         self.modules.eval() # We set the model to eval mode (remove dropout etc)
 
+        # TODO Specific code to saving inner layers activations
+        phones = {}
+        filenames = {}
+
+        global final_layer
+
         # Now we iterate over the dataset and we simply compute_forward and decode
         with torch.no_grad():
 
             transcripts = []
             truth = []
-            for batch in tqdm(dataset, dynamic_ncols=True):
+            for batch_index, batch in tqdm(enumerate(dataset), dynamic_ncols=True, total=len(dataset)):
                 # Make sure that your compute_forward returns the predictions !!!
                 logits, _ = self.compute_forward(batch, stage=sb.Stage.TEST) 
                 predicted = logits.max(1).indices.view(logits.size(0), 1).tolist()
-                
+
                 transcripts += predicted
                 truth += [[int(b) for b in a] for a in batch.phn_list]
+
+                final_layer += [logits.detach().cpu()]
+
+                phones[f"batch_{batch_index}"] = [int(a[0]) for a in batch.phn_list]
+                filenames[f"batch_{batch_index}"] = [a for a in batch.id]
+
+        Path(f'activations/{model_name}/{dataset_name}').mkdir(parents=True, exist_ok=True)
+        with open(f"activations/{model_name}/{dataset_name}/phones.json", 'w+') as f:
+            json.dump(phones, f, indent=4)
+
+        with open(f"activations/{model_name}/{dataset_name}/filenames.json", 'w+') as f:
+            json.dump(filenames, f, indent=4)
 
         return transcripts, truth
     
@@ -357,19 +389,21 @@ if __name__ == "__main__":
 
     asr_brain.hparams.test_wer_file = os.path.join(hparams["output_wer_folder"], "wer_test.txt")
 
-    asr_brain.evaluate(
-        test_dataset,
-        test_loader_kwargs=hparams["test_dataloader_opts"],
-        min_key="WER",
-    )
+    # asr_brain.evaluate(
+    #     test_dataset,
+    #     test_loader_kwargs=hparams["test_dataloader_opts"],
+    #     min_key="WER",
+    # )
 
     for k, v in hparams["to_transcribe"].items():
         transcription_dataset = dataio_prepare_transcript(hparams, v)
-        
+
         transcripts, truth = asr_brain.transcribe_dataset(
             dataset=transcription_dataset,  # Must be obtained from the dataio_function
             min_key="WER",  # We load the model with the lowest WER
-            loader_kwargs=hparams["transcribe_dataloader_opts"], # opts for the dataloading
+            loader_kwargs=hparams["transcribe_dataloader_opts"],  # opts for the dataloading
+            model_name=hparams["name"],
+            dataset_name=k
         )
 
         with open(hparams["output_transcription"].format(dataset=k), "w+") as f:
@@ -377,3 +411,19 @@ if __name__ == "__main__":
                 "labels": truth,
                 "predicted": transcripts
             }, f)
+
+        print("Saving final layer...")
+        torch.save(torch.cat(final_layer, dim=0), f'activations/{hparams["name"]}/{k}/final_layer.pt')
+
+        # TODO Uncomment below to save inner activations
+        print("Saving fully connected layers...")
+        for layer in tqdm(fully_connected):
+            torch.save(torch.cat(fully_connected[layer], dim=0), f'activations/{hparams["name"]}/{k}/{layer}.pt')
+
+        fully_connected = {
+            "FC1": [],
+            "FC2": [],
+            "FC3": []
+        }
+
+        final_layer = []

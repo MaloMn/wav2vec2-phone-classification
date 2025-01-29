@@ -3,7 +3,9 @@
 # ################################
 
 # Seed needs to be set at top of yaml, before objects with parameters are made
-seed: 2001 
+name: bref-array-ft-${{LAYER_ID}}
+seed: 2001
+
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 output_folder: !ref results/array-frozen/<seed>/${{LAYER_ID}}/
 output_wer_folder: !ref <output_folder>/
@@ -14,16 +16,353 @@ output_transcription: !ref <output_folder>/output_{dataset}.json
 transcribe_dataloader_opts:
    batch_size: !ref <test_batch_size>
 
+
 to_transcribe:
-   test: 
+   bref:
       data_folder: /data/coros2/ProjetPathoLoc/Patho/Work/RUGBI/PHD/Bref/wav
-      transcription_dataset: /data/coros1/mmaisonneuve/datasets/bref/test.csv
-   hc_lec:
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/bref/test-balanced-30.csv
+   1:
+     data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+     transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-1-test.csv
+   313:
       data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
-      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-lec-without-alp-test.csv
-   hc_dap:
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-313-test.csv
+   354:
       data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
-      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/hc-dap-without-alp-test.csv
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-354-test.csv
+   16-1:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-16-1-test.csv
+   314:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-314-test.csv
+   355:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-355-test.csv
+   16-2:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-16-2-test.csv
+   315:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-315-test.csv
+   356:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-356-test.csv
+   17:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-17-test.csv
+   316:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-316-test.csv
+   357:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-357-test.csv
+   19:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-19-test.csv
+   317:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-317-test.csv
+   358:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-358-test.csv
+   20:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-20-test.csv
+   318:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-318-test.csv
+   359:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-359-test.csv
+   21:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-21-test.csv
+   319:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-319-test.csv
+   360:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-360-test.csv
+   22:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-22-test.csv
+   320:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-320-test.csv
+   361:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-361-test.csv
+   23:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-23-test.csv
+   321:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-321-test.csv
+   362:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-362-test.csv
+   24:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-24-test.csv
+   322-1:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-322-1-test.csv
+   363:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-363-test.csv
+   25:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-25-test.csv
+   322-2:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-322-2-test.csv
+   364:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-364-test.csv
+   26:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-26-test.csv
+   324-1:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-324-1-test.csv
+   365:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-365-test.csv
+   27:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-27-test.csv
+   324-2:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-324-2-test.csv
+   366:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-366-test.csv
+   28:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-28-test.csv
+   326:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-326-test.csv
+   367:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-367-test.csv
+   29:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-29-test.csv
+   329:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-329-test.csv
+   368:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-368-test.csv
+   31:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-31-test.csv
+   330:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-330-test.csv
+   369-1:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-369-1-test.csv
+   32:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-32-test.csv
+   331:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-331-test.csv
+   369-2:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-369-2-test.csv
+   33:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-33-test.csv
+   332:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-332-test.csv
+   370:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-370-test.csv
+   34:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-34-test.csv
+   333:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-333-test.csv
+   371:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-371-test.csv
+   35:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-35-test.csv
+   334:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-334-test.csv
+   372:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-372-test.csv
+   36:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-36-test.csv
+   335:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-335-test.csv
+   373:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-373-test.csv
+   37:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-37-test.csv
+   336:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-336-test.csv
+   374:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-374-test.csv
+   38:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-38-test.csv
+   337:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-337-test.csv
+   375:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-375-test.csv
+   39:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-39-test.csv
+   338:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-338-test.csv
+   376:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-376-test.csv
+   40:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-40-test.csv
+   339:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-339-test.csv
+   377:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-377-test.csv
+   300:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-300-test.csv
+   340:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-340-test.csv
+   378:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-378-test.csv
+   301-1:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-301-1-test.csv
+   341:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-341-test.csv
+   379:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-379-test.csv
+   301-2:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-301-2-test.csv
+   343:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-343-test.csv
+   381:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-381-test.csv
+   303:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-303-test.csv
+   344:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-344-test.csv
+   382:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-382-test.csv
+   304:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-304-test.csv
+   345-1:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-345-1-test.csv
+   383:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-383-test.csv
+   305:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-305-test.csv
+   345-2:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-345-2-test.csv
+   384:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-384-test.csv
+   306:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-306-test.csv
+   347:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-347-test.csv
+   385:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-385-test.csv
+   307:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-307-test.csv
+   348-1:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-348-1-test.csv
+   386:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-386-test.csv
+   308:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-308-test.csv
+   348-2:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-348-2-test.csv
+   387:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-387-test.csv
+   309:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-309-test.csv
+   350-1:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-350-1-test.csv
+   388:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-388-test.csv
+   310:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-310-test.csv
+   350-2:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-350-2-test.csv
+   390:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-390-test.csv
+   311:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-311-test.csv
+   352:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-352-test.csv
+   392:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-392-test.csv
+   312:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-312-test.csv
+   353:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-353-test.csv
+   393:
+      data_folder: /data/coros1/mmaisonneuve/c2si-wav-16kHz
+      transcription_dataset: /data/coros1/mmaisonneuve/datasets/c2si/tio-393-test.csv
 
 
 # Using the 14k wav2vec model fine-tuned on French language ONLY
@@ -95,7 +434,7 @@ enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
    dnn_blocks: !ref <dnn_layers>
    dnn_neurons: !ref <dnn_neurons>
 
-wav2vec2: !new:speechbrain.lobes.models.huggingface_wav2vec.HuggingFaceWav2Vec2
+wav2vec2: !new:speechbrain.lobes.models.huggingface_transformers.wav2vec2.Wav2Vec2
    source: !ref <wav2vec2_hub>
    output_norm: True
    freeze: !ref <freeze_wav2vec>

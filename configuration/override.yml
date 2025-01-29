@@ -1,0 +1,2 @@
+enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
+   input_shape: [null, 1024]

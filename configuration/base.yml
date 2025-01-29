@@ -1,0 +1,39 @@
+# Seed needs to be set at top of yaml, before objects with parameters are made
+seed: 2001
+
+
+another:
+   result:
+      help: none
+      moza: still
+   name:
+      - malo
+
+bloom: exec
+
+aze: this
+   - list
+
+to_transcribe:
+   test:
+      data_folder: a
+      transcription_dataset: b
+   hc_lec:
+      data_folder: c
+      transcription_dataset: d
+   hc_dap:
+      data_folder: e
+      transcription_dataset: f
+
+# Using the 14k wav2vec model fine-tuned on French language ONLY
+# wav2vec2_hub: LeBenchmark/wav2vec2-FR-14K-large
+wav2vec2_hub: LeBenchmark
+
+model: !new:torch.nn.ModuleList
+   - [!ref <enc>, !ref <ctc_lin>]
+
+enc: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
+   input_shape: [null, 6144] # large 1024 *
+
+end: end
+

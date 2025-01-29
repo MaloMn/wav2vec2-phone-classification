@@ -9,6 +9,6 @@ class ChopSSLLayers(torch.nn.Module):
 
     def forward(self, wav, wav_lens=None):
         hidden_states = self.encoder(wav)
-        print(hidden_states.shape)
+        print("TENSOR SHAPE", hidden_states.shape)
         # Keeping only the specified layers
         return hidden_states[self.layer_id, :, :, :]
