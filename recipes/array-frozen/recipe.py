@@ -8,18 +8,19 @@ import torch
 import logging
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main, if_main_process
-from speechbrain.core import AMPConfig
 from hyperpyyaml import load_hyperpyyaml
+import torch.nn.functional as F
 
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from tqdm import tqdm
+from pathlib import Path
 import json
 
 logger = logging.getLogger(__name__)
 
 
-# TODO Uncomment below to save fully-connected layers
+# INFO Code specific to saving fully-connected layers
 fully_connected = {
     "FC1": [],
     "FC2": [],
@@ -28,7 +29,7 @@ fully_connected = {
 
 final_layer = []
 
-# TODO Code specific to saving fully-connected layers
+# INFO Code specific to saving fully-connected layers
 def meta_hook(layer_name: str):
 
     global fully_connected
@@ -42,6 +43,7 @@ def meta_hook(layer_name: str):
 
     return custom_hook
 
+
 # Define training procedure
 class ASR(sb.Brain):
     def compute_forward(self, batch, stage):
@@ -50,20 +52,34 @@ class ASR(sb.Brain):
         wavs, wav_lens = batch.sig
         wavs, wav_lens = wavs.to(self.device), wav_lens.to(self.device)
 
-        feats = self.modules.weighted_ssl_model(wavs)
+        # layer_id, feats = self.modules.keep_one_layer(wavs, wav_lens)
+        feats = self.encoder(wavs)[-1, :, :, :]
+        feats = feats[:, 3, :]
 
-        hook_1 = self.modules.classifier.act1.register_forward_hook(meta_hook("FC1"))
-        hook_2 = self.modules.classifier.act2.register_forward_hook(meta_hook("FC2"))
-        hook_3 = self.modules.classifier.act3.register_forward_hook(meta_hook("FC3"))
+        if stage == sb.Stage.TEST:
+            hook_1 = self.modules.classifier.act1.register_forward_hook(meta_hook("FC1"))
+            hook_2 = self.modules.classifier.act2.register_forward_hook(meta_hook("FC2"))
+            hook_3 = self.modules.classifier.act3.register_forward_hook(meta_hook("FC3"))
 
-        x = self.modules.enc(feats.view(feats.size(0), -1))
+        feats = self.modules.classifier(feats)
 
-        hook_1.remove()
-        hook_2.remove()
-        hook_3.remove()
+        if stage == sb.Stage.TEST:
+            hook_1.remove()
+            hook_2.remove()
+            hook_3.remove()
 
-        # Compute outputs
-        logits = self.modules.ctc_lin(x)
+        logits = self.modules.linear_layer(feats)
+
+        # print(f"Freezing following hidden layers: {list(range(layer_id, 24))}")
+        # for i in range(layer_id, 24):
+        #     for param in self.modules.wav2vec2.model.encoder.layers[i].parameters():
+        #         param.requires_grad = False
+
+        # logger.info("Layer4 " + str(list(self.modules.wav2vec2.model.encoder.layers[4].final_layer_norm.parameters())))
+        # logger.info("Layer7 " + str(list(self.modules.wav2vec2.model.encoder.layers[7].final_layer_norm.parameters())))
+
+        # print(self.modules.wav2vec2.model.encoder.layers[i])
+        # raise Exception("Stopping here")
 
         return logits, wav_lens
 
@@ -83,37 +99,29 @@ class ASR(sb.Brain):
             # Computing phoneme error rate
             predicted = logits.max(1).indices.view(logits.size(0), 1)
             predicted = [[str(element) for element in sublist] for sublist in predicted.tolist()]
-            self.wer_metric.append(ids, predicted, batch.phn_list)  
+
+            # predicted = predicted.cpu().detach().numpy().astype(np.dtype.str).tolist()
+            self.wer_metric.append(ids, predicted, batch.phn_list)
 
         return loss
 
     def fit_batch(self, batch):
-        amp = AMPConfig.from_name(self.precision)
         should_step = self.step % self.grad_accumulation_factor == 0
 
-        with self.no_sync(not should_step):
-            if self.use_amp:
-                with torch.autocast(
-                    dtype=amp.dtype, device_type=torch.device(self.device).type,
-                ):
-                    outputs = self.compute_forward(batch, sb.Stage.TRAIN)
-                    loss = self.compute_objectives(
-                        outputs, batch, sb.Stage.TRAIN
-                    )
-            else:
-                outputs = self.compute_forward(batch, sb.Stage.TRAIN)
-                loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
+        with self.no_sync():
+            outputs = self.compute_forward(batch, sb.Stage.TRAIN)
+            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
+            (loss / self.grad_accumulation_factor).backward()
 
-            scaled_loss = self.scaler.scale(
-                loss / self.grad_accumulation_factor
-            )
-            self.check_loss_isfinite(scaled_loss)
-            scaled_loss.backward()
+            if should_step:
+                if self.check_gradients(loss):
+                    self.wav2vec_optimizer.step()
+                    self.model_optimizer.step()
 
-        if should_step:
-            self.optimizers_step()
+                self.wav2vec_optimizer.zero_grad()
+                self.model_optimizer.zero_grad()
+                self.optimizer_step += 1
 
-        self.on_fit_batch_end(batch, outputs, loss, should_step)
         return loss.detach().cpu()
 
     def on_stage_start(self, stage, epoch):
@@ -130,20 +138,27 @@ class ASR(sb.Brain):
             self.train_stats = stage_stats
         else:
             # stage_stats["CER"] = self.cer_metric.summarize("error_rate")
-            stage_stats["WER"] = self.wer_metric.summarize("WER")
+            stage_stats["WER"] = self.wer_metric.summarize("error_rate")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            old_lr_model, new_lr_model = self.hparams.lr_annealing_model(stage_stats["loss"])
-            # old_lr_wav2vec, new_lr_wav2vec = self.hparams.lr_annealing_wav2vec(stage_stats["loss"])
-
-            sb.nnet.schedulers.update_learning_rate(self.model_optimizer, new_lr_model)
-            # sb.nnet.schedulers.update_learning_rate(self.wav2vec_optimizer, new_lr_wav2vec)
-
+            old_lr_model, new_lr_model = self.hparams.lr_annealing_model(
+                stage_stats["loss"]
+            )
+            old_lr_wav2vec, new_lr_wav2vec = self.hparams.lr_annealing_wav2vec(
+                stage_stats["loss"]
+            )
+            sb.nnet.schedulers.update_learning_rate(
+                self.model_optimizer, new_lr_model
+            )
+            sb.nnet.schedulers.update_learning_rate(
+                self.wav2vec_optimizer, new_lr_wav2vec
+            )
             self.hparams.train_logger.log_stats(
                 stats_meta={
                     "epoch": epoch,
                     "lr_model": old_lr_model,
+                    "lr_wav2vec": old_lr_wav2vec,
                 },
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
@@ -162,27 +177,28 @@ class ASR(sb.Brain):
 
     def init_optimizers(self):
         "Initializes the wav2vec2 optimizer and model optimizer"
-        # Handling SpeechBrain vs HuggingFace pretrained models
-        # if hasattr(self.modules, "extractor"):  # SpeechBrain pretrained model
-        #     self.wav2vec_optimizer = self.hparams.wav2vec_opt_class(
-        #         self.modules.encoder_wrapper.parameters()
-        #     )
 
-        # else:  # HuggingFace pretrained model
-        #     self.wav2vec_optimizer = self.hparams.wav2vec_opt_class(
-        #         self.modules.wav2vec2.parameters()
-        #     )
+        # print("> Freezing parts of Wav2Vec2")
+        # for i in range(6, 24):
+        #     for param in self.modules.wav2vec2.model.encoder.layers[i].parameters():
+        #         param.requires_grad = False
+
+        self.wav2vec_optimizer = self.hparams.wav2vec_opt_class(
+            self.modules.wav2vec2.parameters()
+        )
 
         self.model_optimizer = self.hparams.model_opt_class(
             self.hparams.model.parameters()
         )
 
         if self.checkpointer is not None:
-            # self.checkpointer.add_recoverable("wav2vec_opt", self.wav2vec_optimizer)
+            self.checkpointer.add_recoverable(
+                "wav2vec_opt", self.wav2vec_optimizer
+            )
             self.checkpointer.add_recoverable("modelopt", self.model_optimizer)
 
     def zero_grad(self, set_to_none=False):
-        # self.wav2vec_optimizer.zero_grad(set_to_none)
+        self.wav2vec_optimizer.zero_grad(set_to_none)
         self.model_optimizer.zero_grad(set_to_none)
 
     def transcribe_dataset(self, dataset, min_key, loader_kwargs, model_name, dataset_name):
@@ -211,7 +227,7 @@ class ASR(sb.Brain):
                 # Make sure that your compute_forward returns the predictions !!!
                 logits, _ = self.compute_forward(batch, stage=sb.Stage.TEST) 
                 predicted = logits.max(1).indices.view(logits.size(0), 1).tolist()
-
+                
                 transcripts += predicted
                 truth += [[int(b) for b in a] for a in batch.phn_list]
 
@@ -230,29 +246,25 @@ class ASR(sb.Brain):
         return transcripts, truth
     
 
-def dataio_prepare(hparams):
-    """This function prepares the datasets to be used in the brain class.
-    It also defines the data processing pipeline through user-defined functions."""
-    data_folder = hparams["data_folder"]
-
-    train_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["train_csv"], replacements={"data_folder": data_folder},
+def load_dataset(name: str, replacement=None):
+    output = sb.dataio.dataset.DynamicItemDataset.from_csv(
+        csv_path=hparams[name], replacements=replacement,
     )
 
     # we sort training data to speed up training and get better results.
-    train_data = train_data.filtered_sorted(sort_key="wav")
+    return output.filtered_sorted(sort_key="wav")
+
+
+def dataio_prepare(hparams):
+    """This function prepares the datasets to be used in the brain class.
+    It also defines the data processing pipeline through user-defined functions."""
+
     hparams["train_dataloader_opts"]["shuffle"] = False
+    data_folder, data_folder_cp = hparams["data_folder"], hparams["cp_data_folder"]
 
-    valid_data = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["valid_csv"], replacements={"data_folder": data_folder},
-    )
-    valid_data = valid_data.filtered_sorted(sort_key="wav")
-
-    # test is separate
-    test_dataset = sb.dataio.dataset.DynamicItemDataset.from_csv(
-        csv_path=hparams["test_csv"], replacements={"data_folder": data_folder},
-    )
-    test_dataset = test_dataset.filtered_sorted(sort_key="wav")
+    train_data = load_dataset("train_csv", {"data_folder": data_folder, "cp_data_folder": data_folder_cp})
+    valid_data = load_dataset("valid_csv", {"data_folder": data_folder, "cp_data_folder": data_folder_cp})
+    test_dataset = load_dataset("test_csv", {"data_folder": data_folder, "cp_data_folder": data_folder_cp})
 
     datasets = [train_data, valid_data, test_dataset]
 
@@ -260,17 +272,21 @@ def dataio_prepare(hparams):
     @sb.utils.data_pipeline.takes("wav", "start")
     @sb.utils.data_pipeline.provides("sig")
     def audio_pipeline(wav, start):
-        # TODO Also care about what happens if the segment is located at the end of an audio!
         fr: int = int(hparams["sample_rate"] / 1_000)
-        start = max(0, int(start) * fr - (hparams["segment_length"] - 10) // 2)
-        stop = start + hparams["segment_length"]
+        start = int(start) * fr - (hparams["segment_length"] - 10) // 2
+        stop = start + hparams["segment_length"] + 1
 
         sig = sb.dataio.dataio.read_audio(({
             "file": wav,
-            "start": start,
+            "start": max(0, start),
             "stop": stop
         }))
-    
+
+        # Add padding at the beginning if needed.
+        # This ensures that the phone 10ms segment is in the middle of the signal.
+        if start < 0:
+            return torch.cat((torch.zeros((start * (-1),)), sig), dim=0)
+
         return sig
 
     sb.dataio.dataset.add_dynamic_item(datasets, audio_pipeline)
@@ -374,6 +390,10 @@ if __name__ == "__main__":
         run_on_main(hparams["pretrainer"].collect_files)
         hparams["pretrainer"].load_collected(asr_brain.device)
 
+    # We dynamicaly add the tokenizer to our brain class.
+    # NB: This tokenizer corresponds to the one used for the LM!!
+    # asr_brain.tokenizer = label_encoder
+
     # Training
     asr_brain.fit(
         asr_brain.hparams.epoch_counter,
@@ -397,11 +417,11 @@ if __name__ == "__main__":
 
     for k, v in hparams["to_transcribe"].items():
         transcription_dataset = dataio_prepare_transcript(hparams, v)
-
+        
         transcripts, truth = asr_brain.transcribe_dataset(
             dataset=transcription_dataset,  # Must be obtained from the dataio_function
             min_key="WER",  # We load the model with the lowest WER
-            loader_kwargs=hparams["transcribe_dataloader_opts"],  # opts for the dataloading
+            loader_kwargs=hparams["transcribe_dataloader_opts"], # opts for the dataloading
             model_name=hparams["name"],
             dataset_name=k
         )
